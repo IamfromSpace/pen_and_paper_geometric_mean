@@ -13,10 +13,10 @@ We can make informed guesses, but almost never know the exact answer, and guesse
 To handle this, we use a wisdom of the crowd approach, averaging everyone's guess.
 
 Wisdom of the crowd still works best with more information, so things like, "I know it's the Burj Khalifa," "I just saw that the space needle is 600ft," "I'm pretty sure it's under 200 floors," and "a standard floor is about 12ft," are all quite helpful.
-However, we want to avoid information that's too close to a guess guess like "It must be over 1000ft, right?", as they anchor other people's guesses.
+However, we want to avoid information that's too close to a guess like "It must be over 1000ft, right?", as they anchor other people's guesses.
 People get uncomfortable guessing numbers that break from consensus, but this technique relies on it.
 
-The arithmetic mean, however, do quite poorly when the range of guesses gets very wide, as large answers dominate.
+The arithmetic mean, however, does quite poorly when the range of guesses gets very wide, as large answers dominate.
 If the group guesses 10, 10, 10, and 100,000, then the answer will be 25k, even though most people thought the answer would be small.
 Overestimating is also especially problematic, because teams that guessed under beat you by default.
 Even if the correct answer was 12.5k, a team that guessed 1 would still beat you.
@@ -40,12 +40,12 @@ People guess in round numbers.
 ### Log + Linear Interpolation
 
 This approach does not require any memorization, and is no more difficult than the arithmetic mean.
-We covert each guess to `[non-decimal digit count].[guess]`, then average.
+We convert each guess to `[digit_count].[first_digit]`, then average.
 We then reverse this process where if the average is `[x].[y]`, we take the first `x` digits of `y`.
 So if the guesses are 300, 10000, 900, 70, we first convert this to 3.3, 5.1, 3.9, and 2.7.
 The average is 3.75, so the final guess is 750.
 
-Digit count is an equivalent replacement for the floor of the logarithm here.
+Digit count serves as a proxy for the floor of the base-10 logarithm here.
 Since it's always 1 greater, it precludes properties like log(a * b) = log(a) + log(b).
 However, the additional 1 to all guesses just acts as an additional 1 to the average, and it disappears in the reverse process.
 
@@ -55,8 +55,8 @@ This method assumes that 500 is 50% between 100 and 1000, even though it's close
 
 Error from averaging the whole number portion will also result in skew.
 Say guesses are 10, 10, and 100.
-In this 2.1, 2.1, 3.1, for an average of 3.433..., and a final guess of 433.
-That leftover 0.333 from averaging 2, 2, and 3, was accurate on the log scale, but it is inaccurately converted back to the linear scale.
+In this approach: 2.1, 2.1, 3.1, for an average of 2.43, and a final guess of 43.
+That leftover 0.33 from averaging the whole parts (2, 2, and 3), was accurate on the log scale, but it is inaccurately converted back to the linear scale.
 The true geometric mean was 215.
 
 However, because only the decimal portion results in estimation, error is bounded.
@@ -94,7 +94,7 @@ So 2.333 becomes 250, 7.75 becomes 60M, 4.167 becomes 16k.
 ### Comparison
 
 We use Monte Carlo simulation to get reasonable estimates about accuracy.
-To ensure correctness while maximizing speed, we use the Rust programming language.
+To ensure correctness while maximizing speed, we use the Rust programming language for the simulation.
 While a language like Haskell can frequently give us even greater correctness guarantees, logarithms cannot be calculated with perfect precision in any language.
 
-We use LEAN to actually prove error bounds.
+We use LEAN to formally prove error bounds for the pen-and-paper methods.
