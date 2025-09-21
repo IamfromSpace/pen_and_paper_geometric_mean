@@ -35,6 +35,8 @@ Doing logarithms accurately by hand is out of the question, so we instead need a
 
 People guess in round numbers.
 
+All trivia questions involve numbers ≥ 1, so our approximation methods need only be designed for this domain.
+
 ## Approaches
 
 ### Log + Linear Interpolation
