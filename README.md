@@ -40,10 +40,15 @@ People guess in round numbers.
 ### Log + Linear Interpolation
 
 This approach does not require any memorization, and is no more difficult than the arithmetic mean.
-We convert each guess to `[digit_count].[first_digit]`, then average.
-We then reverse this process where if the average is `[x].[y]`, we take the first `x` digits of `y`.
+We convert each guess to `[digit_count].[remaining_digits]`, then average.
+We then reverse this process where if the average is `[x].[y]`, we take the first `x` digits starting with `y`.
 So if the guesses are 300, 10000, 900, 70, we first convert this to 3.3, 5.1, 3.9, and 2.7.
 The average is 3.75, so the final guess is 750.
+
+However, there's an edge case: if the decimal portion rounds to 0 or is very small (less than 0.1), we treat it as 0.1 instead.
+This prevents nonsensical answers like "0500" or "0000".
+For example, with guesses 80, 80, 80, 800, we convert to 2.8, 2.8, 2.8, 3.8.
+The average is 3.05, but since 0.05 < 0.1, we treat it as 3.1, giving us a final answer of 100.
 
 Digit count serves as a proxy for the floor of the base-10 logarithm here.
 Since it's always 1 greater, it precludes properties like log(a * b) = log(a) + log(b).
