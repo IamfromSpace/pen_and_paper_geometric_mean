@@ -110,6 +110,13 @@ pub fn log_linear_approximation(values: &[f64]) -> Result<f64, GeometricMeanErro
 - Construct result by multiplying fractional part by appropriate power of 10
 - Example: 3.75 → 3 digits, 0.75 * 1000 = 750; 4.1 → 4 digits, 0.1 * 10000 = 1000
 
+#### Performance Considerations
+- **Avoid unnecessary allocations**: Use iterator operations directly rather than collecting into intermediate Vec when possible
+- Examples of preferred patterns:
+  - ✅ `values.iter().map(|&v| transform(v)).sum()` (direct sum)
+  - ❌ `values.iter().map(|&v| transform(v)).collect::<Vec<_>>().iter().sum()` (unnecessary collection)
+- Generally avoid operations that obviously degrade performance without providing clarity benefits
+
 ### Success Criteria
 - All tests pass including README examples
 - `cargo test` runs clean
