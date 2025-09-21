@@ -4,6 +4,7 @@
 - **Minimal changes only**: Change only lines directly required for the task
 - **Avoid unrelated modifications**: Don't alter existing code that works correctly
 - **Optimize for review**: Every changed line adds cognitive load for reviewers
+- **Sentences in Markdown Paragraphs**: Sentences within a paragraph should always be separated by newlines, so diffs highlight only sentences changed, not the entire paragraph.
 
 ## Plans
 
