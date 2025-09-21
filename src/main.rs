@@ -1,3 +1,5 @@
+mod log_linear;
+
 #[derive(Debug, PartialEq)]
 pub enum GeometricMeanError {
     EmptyInput,
