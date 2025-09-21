@@ -10,6 +10,21 @@
 All changes have plans which are present in the `plan` directory as markdown files with names `${RFC-3339 Time Stamp}-${Summary}.md`.
 Always read the README.md file before making any changes, to ensure all changes are aligned with the overall project vision.
 
+### Planning Approach
+
+Plans should be resistant to being accidentally incorrect by focusing on concepts and requirements rather than brittle implementation details:
+
+**Good**: Describe the behavior, structure, and relationships needed
+- "Add QuickCheck dependency for property-based testing"
+- "Test mathematical properties like order independence"
+
+**Avoid**: Specific version numbers, exact code snippets, or implementation details that may change
+- "Add quickcheck = '1.0'" (version may be outdated)
+- "Add module with `mod property_tests {}`" (syntax may be wrong)
+- "Use exactly this function signature: `fn test_...`" (may not compile)
+
+Plans should capture the intent and requirements clearly enough that implementation can adapt to current reality while staying true to the goal.
+
 ## Commit Strategy
 
 Commits should be bite-sized changes that keep the repository in a healthy state (all tests pass, formatting, etc).
