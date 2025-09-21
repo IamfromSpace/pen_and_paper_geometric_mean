@@ -8,3 +8,4 @@
 ## Plans
 
 All changes have plans which are present in the `plan` directory as markdown files with names `${RFC-3339 Time Stamp}-${Summary}.md`.
+Always read the README.md file before making any changes, to ensure all changes are aligned with the overall project vision.
