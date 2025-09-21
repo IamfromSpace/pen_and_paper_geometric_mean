@@ -47,6 +47,7 @@ In `src/main.rs`, add: `mod log_linear;`
 pub enum GeometricMeanError {
     EmptyInput,
     NonPositiveValue,
+    ValueTooSmall,
 }
 
 pub fn log_linear_approximation(values: &[f64]) -> Result<f64, GeometricMeanError>
@@ -65,6 +66,8 @@ pub fn log_linear_approximation(values: &[f64]) -> Result<f64, GeometricMeanErro
 #### Error Handling
 - Duplicate `GeometricMeanError` enum in this module
 - Same validation as `geometric_mean`: no empty input, no non-positive values
+- Add validation for values < 1.0 → `GeometricMeanError::ValueTooSmall`
+- Values less than 1 are out of scope for this pen-and-paper method due to complexity
 
 ### Test Cases to Implement
 
@@ -84,25 +87,28 @@ pub fn log_linear_approximation(values: &[f64]) -> Result<f64, GeometricMeanErro
 1. **Empty input** → `GeometricMeanError::EmptyInput`
 2. **Zero/negative values** → `GeometricMeanError::NonPositiveValue`
 3. **Very large numbers** (test precision limits)
-4. **Very small numbers** (test precision limits)
+4. **Values < 1.0** → `GeometricMeanError::ValueTooSmall`
 
 ### Implementation Details
 
 #### Digit Counting Strategy
 - Use logarithm base 10 to count digits: `(value.log10().floor() as i32) + 1`
-- Handle edge case of values < 1.0 properly
+- All input values are >= 1.0, so no special handling needed for small values
 
 #### Fractional Part Extraction
+- Use numerical operations only (no string manipulation for performance)
 - After determining digit count, extract all remaining digits as fractional part
 - Example: 2847 → 4 digits, remaining digits 2847, so becomes `4.2847`
+- Algorithm: divide by appropriate power of 10 to normalize the fractional part
 
 #### Reverse Conversion Logic
-- Split log_value into whole and fractional parts
+- Use numerical operations only (no string manipulation for performance)
+- Split log_value into whole and fractional parts using floor() and modulo
 - Whole part = digit count
 - **Edge case first**: If fractional part < 0.1, set fractional part = 0.1
 - Fractional part represents the significant digits directly
-- Construct result by placing fractional digits at the start, padding with zeros to reach digit count
-- Example: 3.75 → 3 digits, "75" + "0" = 750; 4.1 → 4 digits, "1" + "000" = 1000
+- Construct result by multiplying fractional part by appropriate power of 10
+- Example: 3.75 → 3 digits, 0.75 * 1000 = 750; 4.1 → 4 digits, 0.1 * 10000 = 1000
 
 ### Success Criteria
 - All tests pass including README examples
