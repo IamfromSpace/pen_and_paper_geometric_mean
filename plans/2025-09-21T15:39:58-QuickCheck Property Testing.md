@@ -82,11 +82,9 @@ Create dedicated property test modules:
 
 #### Custom Generators
 
-1. **PositiveF64**: Generates positive floating point numbers for exact geometric mean
-2. **GeF64**: Generates numbers ≥ 1.0 for log-linear approximation
+1. **PositiveF64**: Generates positive floating point numbers for exact geometric mean (1e-100 to 1e100)
+2. **GeOneF64**: Generates numbers ≥ 1.0 for log-linear approximation (1.0 to 1e50)
 3. **SameDigitCount**: Generates arrays where all numbers have the same digit count
-4. **ReasonableRange**: Generates arrays where min/max ratio is within reasonable bounds (e.g., 1:1000)
-5. **PowersOfTen**: Generates numbers that are clean powers of 10 for testing scaling behavior
 
 #### Error Handling Strategy
 
@@ -157,10 +155,10 @@ Based on the principle of minimal, meaningful commits that keep the repository h
 ### Commit 2: Add Property Tests for Log-Linear Approximation
 **Goal**: Add comprehensive property-based testing for the approximation method
 - Add property test module to `src/log_linear.rs`
-- Implement custom generator for numbers ≥ 1.0 (log-linear method's domain)
-- Add approximation-specific properties: order of magnitude correctness, same digit count equivalence, input validation, bounds behavior
+- Implement custom generator `GeOneF64` for numbers ≥ 1.0 (log-linear method's domain)
+- Implement custom generator `SameDigitCount` for testing same digit count behavior
+- Add approximation-specific properties: order of magnitude correctness, same digit count equivalence, bounds behavior
 - Add cross-method comparison properties validating relationship between exact and approximation methods
-- Add specialized generators for same digit count inputs, reasonable ranges, and powers of ten as needed
 - All tests should pass, demonstrating approximation method behaves predictably
 
 **Rationale**: This completes the property testing suite by validating the approximation method and its relationship to the exact method.
