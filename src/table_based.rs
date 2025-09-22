@@ -197,6 +197,8 @@ mod tests {
         }
 
         #[quickcheck]
+        // TODO: Fix order independence test failure - precision issues with table lookups
+        // causing order-dependent rounding errors when same values processed in different orders
         fn prop_order_independence(mut values: Vec<GeOneF64>) -> TestResult {
             if values.len() < 2 {
                 return TestResult::discard();
