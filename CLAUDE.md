@@ -1,5 +1,35 @@
 # Claude Code Guidelines
 
+## Evolvability, Abstraction, and Testing
+
+The primary property of a good code base is that it can evolve, because the most likely thing it will do is change.
+This is usually just extension, but often a core dependency is outgrown, yielding sweeping changes.
+We must optimize for change, or be bogged down.
+
+Abstraction is the key mechanism to optimize for change.
+The guiding idea here is that "all models are wrong some are useful."
+We're looking for abstractions that aren't wrong for our particular domain, and as efficiently useful as possible.
+
+When calculating the trajectory of a baseball, it suffices to know that gravity is 9.8m/s^2.
+But when building a GPS satellite, this model is terribly wrong.
+Amazingly, we need to account for Special and even General Relativity.
+Those more robust models are _still_ wrong, as they don't unify with quantum physics, but they are wrong in a way that doesn't matter for the problem.
+
+Our baseball _can_ use this model, but it won't benefit enough from being less wrong.
+It will be overall worse, because the cognitive load is much higher.
+Possibly we need to account for the variation of gravity across the poles or other factors; this isn't an excuse to solve things poorly.
+But complexity needs to pay its keep.
+
+Tests serve two purposes:
+- Eliminate all doubts that the new code is correct
+- Preserve the correctness of the code as future changes are introduced
+
+Since the goal of old tests is to preserve old functionality, we must be _extremely_ cautious when modifying old tests.
+That also implies that when writing new tests we must be _extremely_ careful to write tests in ways that won't force future implementers to change them.
+It's not just wasteful but dangerous.
+
+The key is, again, good abstraction.
+
 ## Diff Optimization
 - **Minimal changes only**: Change only lines directly required for the task
 - **Avoid unrelated modifications**: Don't alter existing code that works correctly
