@@ -179,7 +179,7 @@ mod tests {
 
     mod property_tests {
         use super::*;
-        use crate::geometric_mean;
+        use crate::exact::geometric_mean;
         use quickcheck::{Arbitrary, Gen, TestResult};
         use quickcheck_macros::quickcheck;
 
