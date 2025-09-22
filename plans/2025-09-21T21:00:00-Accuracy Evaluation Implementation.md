@@ -50,7 +50,7 @@ The evaluator module only has the following public interface.
 This module does _absolutely no_ formatting or printing, just pure statistical analysis.
 
 ```rust
-pub fn evaluate_estimate<R: Rng, T: EstimateGeometricMean>(rng: &mut R, method: T, min: f64, max: f64, num_tests: usize) -> Results
+pub fn evaluate_estimate<R: Rng, T: EstimateGeometricMean>(rng: &mut R, min: f64, max: f64, num_tests: usize) -> Results
 ```
 
 This method should iterate in place or steam or fold to prevent allocation of large lists of of tests inputs or outputs.
