@@ -111,12 +111,45 @@ struct AccuracyStats {
 1. **Fixed seed parameter** - Less flexible, global state concerns
 2. **Thread-local RNG** - Global state, harder to test deterministically
 
+## Testing Strategy
+
+### Evaluator Testing Requirements
+The evaluation module contains pure functions that are critical for correctness.
+All functions must be thoroughly tested to ensure reliable comparison results.
+
+### Test Data Generator Testing
+- **Deterministic output**: Same seed produces identical test data across runs
+- **Range validation**: Generated values respect min/max bounds
+- **Set size validation**: Generated sets have correct sizes (2-10 values)
+- **Boundary values**: min_value, max_value, exactly 2 and 10 element sets
+
+### Accuracy Evaluation Testing
+- **Perfect approximation**: When exact == approximation, relative error = 0
+- **Known error cases**: Hand-calculated examples with expected metrics
+- **Success rate boundaries**: Test 0.1x and 10x ratio thresholds precisely
+- **Single test case**: Arrays with length 1
+- **Identical values**: All exact and approximation values are the same
+- **Division by zero protection**: Ensure exact values are never zero
+
+### Test Implementation Approach
+- **Unit tests for pure functions**: Each function tested in isolation
+- **Property-based tests**: Use QuickCheck for boundary conditions and input validation
+
+### Expected Test Coverage
+- **generate_test_data()**: Range validation, determinism, set sizes, boundary values
+- **evaluate_accuracy()**: Error calculations, success rate logic, known cases, boundary conditions
+- **AccuracyStats**: Data structure correctness
+
 ## Expected Deliverables
 
-### Minimal Integration
+### Core Implementation
 - Add evaluation functionality to existing main.rs
 - All presentation logic in main.rs
 - Pure functions in evaluation module
+
+### Testing Implementation
+- Comprehensive unit tests for evaluation module
+- Property-based tests for boundary conditions and input validation
 
 ## Success Criteria
 
@@ -132,3 +165,10 @@ struct AccuracyStats {
 - Consistent with existing code style and error handling
 - Reproducible results with fixed random seed
 - All presentation decisions made in main.rs
+
+### Testing Requirements
+- All evaluation functions have comprehensive unit tests
+- Property-based tests verify mathematical correctness
+- Test coverage includes edge cases and boundary conditions
+- Deterministic test data generation verified
+- Success rate calculation accuracy validated
