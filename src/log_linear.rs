@@ -176,4 +176,178 @@ mod tests {
         // For pen-and-paper approximation, should be within same order of magnitude
         assert!(result > expected / 10.0 && result < expected * 10.0);
     }
+
+    mod property_tests {
+        use super::*;
+        use crate::geometric_mean;
+        use quickcheck::{Arbitrary, Gen, TestResult};
+        use quickcheck_macros::quickcheck;
+
+        #[derive(Clone, Debug)]
+        struct GeOneF64(f64);
+
+        impl Arbitrary for GeOneF64 {
+            fn arbitrary(g: &mut Gen) -> Self {
+                let value = loop {
+                    let candidate = f64::arbitrary(g).abs();
+                    if candidate >= 1.0 && candidate.is_finite() && candidate < 1e50 {
+                        break candidate;
+                    }
+                };
+                GeOneF64(value)
+            }
+        }
+
+        #[derive(Clone, Debug)]
+        struct SameDigitCount(Vec<f64>);
+
+        impl Arbitrary for SameDigitCount {
+            fn arbitrary(g: &mut Gen) -> Self {
+                let digit_count = (u8::arbitrary(g) % 6) + 1; // 1-6 digits
+                let base = 10.0_f64.powi(digit_count as i32 - 1);
+                let upper = base * 10.0;
+
+                let size = (usize::arbitrary(g) % 8) + 1; // 1-8 values
+                let values: Vec<f64> = (0..size)
+                    .map(|_| {
+                        let fraction = loop {
+                            let candidate = f64::arbitrary(g).abs() % 1.0;
+                            if candidate.is_finite() {
+                                break candidate;
+                            }
+                        };
+                        base + fraction * (upper - base)
+                    })
+                    .collect();
+
+                SameDigitCount(values)
+            }
+        }
+
+
+        #[quickcheck]
+        fn prop_order_of_magnitude_correctness(values: Vec<GeOneF64>) -> TestResult {
+            if values.is_empty() {
+                return TestResult::discard();
+            }
+
+            let nums: Vec<f64> = values.iter().map(|x| x.0).collect();
+            let approximation = log_linear_approximation(&nums).unwrap();
+            let exact = geometric_mean(&nums).unwrap();
+
+            TestResult::from_bool(approximation >= exact / 10.0 && approximation <= exact * 10.0)
+        }
+
+        #[quickcheck]
+        fn prop_same_digit_count_equivalence(same_digits: SameDigitCount) -> TestResult {
+            if same_digits.0.is_empty() {
+                return TestResult::discard();
+            }
+
+            let approximation = log_linear_approximation(&same_digits.0).unwrap();
+            let arithmetic_mean = same_digits.0.iter().sum::<f64>() / same_digits.0.len() as f64;
+
+            let tolerance = (arithmetic_mean * 1e-10).max(1e-12);
+            TestResult::from_bool((approximation - arithmetic_mean).abs() < tolerance)
+        }
+
+        #[quickcheck]
+        fn prop_single_value_identity(x: GeOneF64) -> bool {
+            let result = log_linear_approximation(&[x.0]).unwrap();
+            let tolerance = (x.0 * 1e-12).max(1e-14);
+            (result - x.0).abs() < tolerance
+        }
+
+        #[quickcheck]
+        fn prop_order_independence(mut values: Vec<GeOneF64>) -> TestResult {
+            if values.len() < 2 {
+                return TestResult::discard();
+            }
+
+            let original: Vec<f64> = values.iter().map(|x| x.0).collect();
+            values.reverse();
+            let reversed: Vec<f64> = values.iter().map(|x| x.0).collect();
+
+            let original_result = log_linear_approximation(&original).unwrap();
+            let reversed_result = log_linear_approximation(&reversed).unwrap();
+
+            let tolerance = (original_result * 1e-12).max(1e-14);
+            TestResult::from_bool((original_result - reversed_result).abs() < tolerance)
+        }
+
+        #[quickcheck]
+        fn prop_monotonicity(a_values: Vec<GeOneF64>, b_values: Vec<GeOneF64>) -> TestResult {
+            if a_values.len() != b_values.len() || a_values.is_empty() {
+                return TestResult::discard();
+            }
+
+            let a_nums: Vec<f64> = a_values.iter().map(|x| x.0).collect();
+            let b_nums: Vec<f64> = b_values.iter().map(|x| x.0).collect();
+
+            let all_a_le_b = a_nums.iter().zip(b_nums.iter()).all(|(a, b)| a <= b);
+            if !all_a_le_b {
+                return TestResult::discard();
+            }
+
+            let a_result = log_linear_approximation(&a_nums).unwrap();
+            let b_result = log_linear_approximation(&b_nums).unwrap();
+
+            let tolerance = (b_result * 1e-12).max(1e-14);
+            TestResult::from_bool(a_result <= b_result + tolerance)
+        }
+
+
+        #[quickcheck]
+        fn prop_minimum_result_bounds(values: Vec<GeOneF64>) -> TestResult {
+            if values.is_empty() {
+                return TestResult::discard();
+            }
+
+            let nums: Vec<f64> = values.iter().map(|x| x.0).collect();
+            let result = log_linear_approximation(&nums).unwrap();
+            let min_val = nums.iter().cloned().fold(f64::INFINITY, f64::min);
+
+            TestResult::from_bool(result >= min_val / 10.0) // Allow some approximation error
+        }
+
+        #[quickcheck]
+        fn prop_maximum_result_bounds(values: Vec<GeOneF64>) -> TestResult {
+            if values.is_empty() {
+                return TestResult::discard();
+            }
+
+            let nums: Vec<f64> = values.iter().map(|x| x.0).collect();
+            let result = log_linear_approximation(&nums).unwrap();
+            let max_val = nums.iter().cloned().fold(0.0, f64::max);
+
+            TestResult::from_bool(result <= max_val * 10.0) // Allow some approximation error
+        }
+
+        #[quickcheck]
+        fn prop_cross_method_same_digit_convergence(same_digits: SameDigitCount) -> TestResult {
+            if same_digits.0.is_empty() {
+                return TestResult::discard();
+            }
+
+            let exact = geometric_mean(&same_digits.0).unwrap();
+            let approximation = log_linear_approximation(&same_digits.0).unwrap();
+
+            // For same digit count, they should be within the same order of magnitude
+            // but may not be exactly equal due to approximation method limitations
+            TestResult::from_bool(approximation >= exact / 10.0 && approximation <= exact * 10.0)
+        }
+
+        #[quickcheck]
+        fn prop_cross_method_order_of_magnitude_agreement(values: Vec<GeOneF64>) -> TestResult {
+            if values.is_empty() {
+                return TestResult::discard();
+            }
+
+            let nums: Vec<f64> = values.iter().map(|x| x.0).collect();
+            let exact = geometric_mean(&nums).unwrap();
+            let approximation = log_linear_approximation(&nums).unwrap();
+
+            TestResult::from_bool(approximation >= exact / 10.0 && approximation <= exact * 10.0)
+        }
+    }
 }
