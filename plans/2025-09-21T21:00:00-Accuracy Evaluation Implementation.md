@@ -38,9 +38,11 @@ Different methods have different input constraints:
 
 #### Testing
 
-All tests for estimated methods use trait interface exclusively - internal functions for approximations should be set to private.
-No new tests are required in estimation modules.
-The exact method should have just a handful of tests that confirms that the exported geometric_mean function and the trait implementation are identical.
+- For approximations, not trait based functions MUST become private
+- Current functions MAY keep their documentation
+- For approximations, tests MUST be updated to use the trait call
+- Do NOT add new tests to the estimation module
+- The exact method MUST get tests that confirm the trait implementation matches the `geometric_mean` function
 
 **Rationale**: Trait is the public API, must be proven correct. Code not tested is not exposed, code that's exposed is tested.
 
