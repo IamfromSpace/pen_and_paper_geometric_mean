@@ -54,7 +54,10 @@ pub fn evaluate_estimate<R: Rng, T: EstimateGeometricMean>(rng: &mut R, method: 
 ```
 
 This method should iterate in place or steam or fold to prevent allocation of large lists of of tests inputs or outputs.
-It accepts a min and a max, because our estimation methods don't support the full range of finite floats, even though the exact method does.
+Don't do something like `let mut values = Vec::with_capacity(test_size);` or `Vec::new()` because this potentially allocates an Vec with billions or trillions of entries!
+We need to have O(1) memory usage, because we want to be able to do extremely huge experiments.
+
+This method accepts a min and a max, because our estimation methods don't support the full range of finite floats, even though the exact method does.
 
 The values generated in the range should be log-uniform.
 The trivia problem assumes that values are distributed in this way, so this is a reasonable assumption to test under.
