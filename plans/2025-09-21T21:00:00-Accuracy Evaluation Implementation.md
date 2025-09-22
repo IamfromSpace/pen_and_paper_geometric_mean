@@ -52,6 +52,9 @@ pub fn evaluate_estimate<R: Rng, T: EstimateGeometricMean>(rng: &mut R, method: 
 This method should iterate in place or steam or fold to prevent allocation of large lists of of tests inputs or outputs.
 It accepts a min and a max, because our estimation methods don't support the full range of finite floats, even though the exact method does.
 
+The values generated in the range should be log-uniform.
+The trivia problem assumes that values are distributed in this way, so this is a reasonable assumption to test under.
+
 The primary property test here is that when evaluating the exact method _as_ the estimate, the result should be perfect.
 
 #### Simplified Statistics
