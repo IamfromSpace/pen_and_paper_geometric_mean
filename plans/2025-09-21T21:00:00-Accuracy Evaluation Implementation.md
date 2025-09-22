@@ -21,10 +21,14 @@ Clean accuracy evaluation for pen-and-paper geometric mean approximation methods
 // traits.rs
 pub trait EstimateGeometricMean {
     type Error: std::error::Error;
-    fn estimate_geometric_mean(&self, values: &[f64]) -> Result<f64, Self::Error>;
+    fn estimate_geometric_mean(values: &[f64]) -> Result<f64, Self::Error>;
 }
 ```
+The estimate method should be static, so we don't have to construct anything for a clearer interface.
+
 **Rationale**: Our evaluator should be able to evaluate _any_ estimation method, we'll use traits to allow this.
+
+This is (mostly) an additive change only, keep the diffs minimal.
 
 #### Associated Error Types
 Different methods have different input constraints:
