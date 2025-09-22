@@ -57,6 +57,11 @@ This method should iterate in place or steam or fold to prevent allocation of la
 Don't do something like `let mut values = Vec::with_capacity(test_size);` or `Vec::new()` because this potentially allocates an Vec with billions or trillions of entries!
 We need to have O(1) memory usage, because we want to be able to do extremely huge experiments.
 
+```
+// WRONG: O(n) memory - DO NOT DO THIS
+let mut values = Vec::with_capacity(num_tests); // VIOLATION!
+```
+
 This method accepts a min and a max, because our estimation methods don't support the full range of finite floats, even though the exact method does.
 
 The values generated in the range should be log-uniform.
@@ -82,6 +87,14 @@ Iteration count will be hard-coded.
 In the future a more robust interface will be offered, we're just looking to set the stage.
 
 No tests here, this is a dead simple demo.
+
+## Performance Considerations
+
+### Memory Usage: O(1) Only
+- **NEVER allocate Vec for test inputs**: `Vec::with_capacity(test_size)` or `Vec::new()`
+- **NEVER collect results**: `.collect()` on large datasets
+- **Use streaming/folding only**: Process one value at a time
+- **Why**: We need to support billion+ test runs without memory exhaustion
 
 ## Testing Strategy
 - **Prefer property tests** - Better bang for the buck
