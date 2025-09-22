@@ -1,4 +1,5 @@
 mod log_linear;
+mod table_based;
 
 #[derive(Debug, PartialEq)]
 pub enum GeometricMeanError {
