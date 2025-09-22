@@ -1,19 +1,19 @@
-# Accuracy Comparison Implementation Plan
+# Method Evaluation Implementation Plan
 
 ## Overview
 
-Simple accuracy comparison between the two pen-and-paper geometric mean approximation methods:
+Simple accuracy evaluation for pen-and-paper geometric mean approximation methods:
 1. **Log-Linear Interpolation** - Uses digit count as logarithm proxy with linear interpolation
 2. **Table-Based Approximation** - Uses memorized 10^(1/10) lookup table for logarithm conversion
 
-Start small and build up from there.
+Start with evaluation foundation first, comparison can be built on top later.
 
 ## Core Requirements
 
-### Comparison Framework
-- Compare both methods against the exact geometric mean calculation
-- Calculate basic accuracy metrics
-- Simple output showing which method performs better
+### Evaluation Framework
+- Evaluate each method against the exact geometric mean calculation
+- Calculate basic accuracy metrics for each method independently
+- Simple output showing metrics for each method
 
 ### Test Data Generation
 - **Log-uniform distribution**: Values uniformly distributed across log scale (consistent with power law assumption)
@@ -25,14 +25,21 @@ Start small and build up from there.
 - **Mean absolute relative error**: Average of |relative errors|
 - **Success rate**: Percentage within 1 order of magnitude of exact result
 
-## Implementation Components
+## Implementation Strategy
 
-### Simple Comparison Engine
-Create a minimal comparison tool that:
-- Generates log-uniform test data
-- Computes results using all three methods (exact, log-linear, table-based)
-- Calculates basic error metrics
-- Outputs simple summary statistics
+### First Commit: Trait Foundation
+Create the trait interface and implement for all methods:
+- **EstimateGeometricMean trait** - Common interface for all methods
+- **Trait implementations** - All three methods implement the trait (exact, log-linear, table-based)
+- **Basic testing** - Verify trait implementations work correctly
+- **Keep existing APIs** - Don't break current function interfaces
+
+### Second Commit: Generic Evaluation Framework
+Build evaluation system on top of trait foundation:
+- **Generic evaluator** - Accepts any trait implementer
+- **Test data generator** - Log-uniform distribution generator
+- **Accuracy metrics** - Calculate error statistics against exact method
+- **Print Stats from main** - Simplest possible execution and output of our evaluator
 
 ### Test Data Generator
 Single generator function:
@@ -41,30 +48,26 @@ Single generator function:
 - Support different input set sizes
 
 ### Basic Output
-Simple text output showing:
-- Mean relative error for each method
-- Success rate (within 1 order of magnitude) for each method
-- Which method wins overall
+Simple text output showing for each method:
+- Mean relative error
+- Success rate (within 1 order of magnitude)
+- Basic summary statistics
 
 ## Expected Deliverables
 
-### Minimal CLI Tool
-A simple command that:
-- Runs comparison with default parameters
-- Shows basic accuracy comparison between the two methods
-- Clearly indicates which method performs better overall
-
 ### Simple Integration
-- Add comparison functionality to existing main.rs
+- Add evaluation functionality to existing main.rs
 - Reuse existing module structure
 - Maintain current error handling patterns
 
 ## Success Criteria
 
 ### Functional Requirements
-- Both approximation methods compared against exact calculation
-- Basic accuracy metrics calculated correctly
-- Clear determination of which method performs better
+- Generic trait-based evaluation framework
+- All three methods implement EstimateGeometricMean trait
+- Exact method evaluation shows near-zero error (validation test)
+- Basic accuracy metrics calculated correctly for any trait implementer
+- Foundation ready for later comparison between multiple methods
 
 ### Quality Requirements
 - Consistent with existing code style and error handling
