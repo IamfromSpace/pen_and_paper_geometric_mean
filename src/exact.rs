@@ -15,6 +15,16 @@ impl std::fmt::Display for GeometricMeanError {
 
 impl std::error::Error for GeometricMeanError {}
 
+pub struct ExactGeometricMean;
+
+impl crate::traits::EstimateGeometricMean for ExactGeometricMean {
+    type Error = GeometricMeanError;
+
+    fn estimate_geometric_mean(values: &[f64]) -> Result<f64, Self::Error> {
+        geometric_mean(values)
+    }
+}
+
 pub fn geometric_mean(values: &[f64]) -> Result<f64, GeometricMeanError> {
     if values.is_empty() {
         return Err(GeometricMeanError::EmptyInput);
@@ -93,6 +103,41 @@ mod tests {
     fn test_geometric_mean_power_law_example() {
         let result = geometric_mean(&[10.0, 10.0, 10.0, 100000.0]).unwrap();
         assert!((result - 100.0).abs() < 1e-8);
+    }
+
+    #[test]
+    fn test_trait_implementation_matches_function() {
+        use crate::traits::EstimateGeometricMean;
+
+        let test_cases = vec![
+            vec![1.0, 4.0],
+            vec![2.0, 8.0],
+            vec![1.0, 2.0, 4.0],
+            vec![5.0],
+            vec![100.0, 10000.0],
+            vec![0.1, 0.01],
+            vec![10.0, 10.0, 10.0, 100000.0],
+        ];
+
+        for values in test_cases {
+            let function_result = geometric_mean(&values).unwrap();
+            let trait_result = ExactGeometricMean::estimate_geometric_mean(&values).unwrap();
+            assert!((function_result - trait_result).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn test_trait_implementation_error_cases() {
+        use crate::traits::EstimateGeometricMean;
+
+        let empty_result = ExactGeometricMean::estimate_geometric_mean(&[]);
+        assert_eq!(empty_result, Err(GeometricMeanError::EmptyInput));
+
+        let zero_result = ExactGeometricMean::estimate_geometric_mean(&[1.0, 0.0, 4.0]);
+        assert_eq!(zero_result, Err(GeometricMeanError::NonPositiveValue));
+
+        let negative_result = ExactGeometricMean::estimate_geometric_mean(&[1.0, -2.0, 4.0]);
+        assert_eq!(negative_result, Err(GeometricMeanError::NonPositiveValue));
     }
 
     mod property_tests {

@@ -17,6 +17,16 @@ impl std::fmt::Display for GeometricMeanError {
 
 impl std::error::Error for GeometricMeanError {}
 
+pub struct TableBasedApproximation;
+
+impl crate::traits::EstimateGeometricMean for TableBasedApproximation {
+    type Error = GeometricMeanError;
+
+    fn estimate_geometric_mean(values: &[f64]) -> Result<f64, Self::Error> {
+        table_based_approximation(values)
+    }
+}
+
 const TABLE_ENTRIES: [(f64, f64); 10] = [
     (0.0, 1.0),
     (0.1, 1.25),
@@ -69,7 +79,7 @@ fn log_representation_to_number(log_value: f64) -> f64 {
     multiplier * 10.0_f64.powi(zeros)
 }
 
-pub fn table_based_approximation(values: &[f64]) -> Result<f64, GeometricMeanError> {
+fn table_based_approximation(values: &[f64]) -> Result<f64, GeometricMeanError> {
     if values.is_empty() {
         return Err(GeometricMeanError::EmptyInput);
     }
@@ -145,16 +155,18 @@ mod tests {
 
     #[test]
     fn test_table_based_approximation_single_value() {
-        let result = table_based_approximation(&[500.0]).unwrap();
+        use crate::traits::EstimateGeometricMean;
+        let result = TableBasedApproximation::estimate_geometric_mean(&[500.0]).unwrap();
         assert!((result - 500.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_table_based_approximation_error_cases() {
-        assert_eq!(table_based_approximation(&[]), Err(GeometricMeanError::EmptyInput));
-        assert_eq!(table_based_approximation(&[1.0, 0.0, 4.0]), Err(GeometricMeanError::NonPositiveValue));
-        assert_eq!(table_based_approximation(&[1.0, -2.0, 4.0]), Err(GeometricMeanError::NonPositiveValue));
-        assert_eq!(table_based_approximation(&[0.5, 2.0, 4.0]), Err(GeometricMeanError::ValueTooSmall));
+        use crate::traits::EstimateGeometricMean;
+        assert_eq!(TableBasedApproximation::estimate_geometric_mean(&[]), Err(GeometricMeanError::EmptyInput));
+        assert_eq!(TableBasedApproximation::estimate_geometric_mean(&[1.0, 0.0, 4.0]), Err(GeometricMeanError::NonPositiveValue));
+        assert_eq!(TableBasedApproximation::estimate_geometric_mean(&[1.0, -2.0, 4.0]), Err(GeometricMeanError::NonPositiveValue));
+        assert_eq!(TableBasedApproximation::estimate_geometric_mean(&[0.5, 2.0, 4.0]), Err(GeometricMeanError::ValueTooSmall));
     }
 
     #[test]
@@ -171,6 +183,7 @@ mod tests {
     mod property_tests {
         use super::*;
         use crate::exact::geometric_mean;
+        use crate::traits::EstimateGeometricMean;
         use quickcheck::{Arbitrary, Gen, TestResult};
         use quickcheck_macros::quickcheck;
 
@@ -191,7 +204,7 @@ mod tests {
 
         #[quickcheck]
         fn prop_single_value_identity(x: GeOneF64) -> bool {
-            let result = table_based_approximation(&[x.0]).unwrap();
+            let result = TableBasedApproximation::estimate_geometric_mean(&[x.0]).unwrap();
             let tolerance = x.0 * 0.5;
             (result - x.0).abs() < tolerance
         }
@@ -208,8 +221,8 @@ mod tests {
             values.reverse();
             let reversed: Vec<f64> = values.iter().map(|x| x.0).collect();
 
-            let original_result = table_based_approximation(&original).unwrap();
-            let reversed_result = table_based_approximation(&reversed).unwrap();
+            let original_result = TableBasedApproximation::estimate_geometric_mean(&original).unwrap();
+            let reversed_result = TableBasedApproximation::estimate_geometric_mean(&reversed).unwrap();
 
             let tolerance = (original_result * 1e-6).max(1e-8);
             TestResult::from_bool((original_result - reversed_result).abs() < tolerance)
@@ -222,7 +235,7 @@ mod tests {
             }
 
             let nums: Vec<f64> = values.iter().map(|x| x.0).collect();
-            let approximation = table_based_approximation(&nums).unwrap();
+            let approximation = TableBasedApproximation::estimate_geometric_mean(&nums).unwrap();
             let exact = geometric_mean(&nums).unwrap();
 
             TestResult::from_bool(approximation >= exact / 10.0 && approximation <= exact * 10.0)
@@ -235,7 +248,7 @@ mod tests {
             }
 
             let nums: Vec<f64> = values.iter().map(|x| x.0).collect();
-            let result = table_based_approximation(&nums).unwrap();
+            let result = TableBasedApproximation::estimate_geometric_mean(&nums).unwrap();
             let min_val = nums.iter().cloned().fold(f64::INFINITY, f64::min);
 
             TestResult::from_bool(result >= min_val / 10.0)
@@ -248,7 +261,7 @@ mod tests {
             }
 
             let nums: Vec<f64> = values.iter().map(|x| x.0).collect();
-            let result = table_based_approximation(&nums).unwrap();
+            let result = TableBasedApproximation::estimate_geometric_mean(&nums).unwrap();
             let max_val = nums.iter().cloned().fold(0.0, f64::max);
 
             TestResult::from_bool(result <= max_val * 10.0)
@@ -268,8 +281,8 @@ mod tests {
                 return TestResult::discard();
             }
 
-            let a_result = table_based_approximation(&a_nums).unwrap();
-            let b_result = table_based_approximation(&b_nums).unwrap();
+            let a_result = TableBasedApproximation::estimate_geometric_mean(&a_nums).unwrap();
+            let b_result = TableBasedApproximation::estimate_geometric_mean(&b_nums).unwrap();
 
             let tolerance = (b_result * 0.01).max(1e-6);
             TestResult::from_bool(a_result <= b_result + tolerance)
