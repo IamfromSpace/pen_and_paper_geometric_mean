@@ -6,96 +6,77 @@ Clean accuracy evaluation for pen-and-paper geometric mean approximation methods
 1. **Log-Linear Interpolation** - Uses digit count as logarithm proxy with linear interpolation
 2. **Table-Based Approximation** - Uses memorized 10^(1/10) lookup table for logarithm conversion
 
-Focus on pure evaluation logic with clean separation of concerns.
+## Architecture Principles
 
-## Core Requirements
+- **Trait-only public API**: Internal functions private, forcing consistent interface usage
+- **Streaming evaluation**: Iterator-based processing, no large Vec allocations
+- **Simplified metrics**: Focus on mean absolute relative error as primary comparison
+- **Clean separation**: Evaluation logic separate from presentation
+- **Set the Stage**: This change should lay the ground work for comparison, not boil the ocean
 
-### Evaluation Framework
-- Evaluate each method against the exact geometric mean calculation
-- Calculate accuracy metrics as pure functions
-- No presentation logic in evaluation code
+## Key Design Decisions
 
-### Test Data Generation
-- **Log-uniform distribution**: Values uniformly distributed across log scale (consistent with power law assumption)
-- Various input set sizes (2-10 values)
-- Fixed seed for reproducible results
-
-### Basic Accuracy Metrics
-- **Relative error**: (approximation - exact) / exact
-- **Mean absolute relative error**: Average of |relative errors|
-- **Success rate**: Percentage within 1 order of magnitude of exact result
-
-## Implementation Strategy
-
-### Clean Architecture Principles
-- **EstimateGeometricMean trait** - Single responsibility: estimate geometric mean
-- **Exact method implements trait too** - Enables self-testing and consistency
-- **Evaluator uses concrete exact method** - No injection, calls exact::geometric_mean directly
-- **Pure evaluation functions** - Return data structures, no printing/formatting
-- **Presentation in main.rs** - All naming, formatting, and output logic
-
-### First Commit: Minimal Trait Foundation
-Create simple trait interface:
-- **EstimateGeometricMean trait** - Only `fn estimate_geometric_mean(&self, values: &[f64]) -> Result<f64, Self::Error>`
-- **Associated Error type** - Each method has its own error type (exact doesn't need ValueTooSmall variant)
-- **No name() method** - Caller decides naming and presentation
-- **Trait implementations** - All three methods (exact, log-linear, table-based)
-- **Keep existing APIs** - Don't break current function interfaces
-
-#### Error Type Rationale
-Different methods have different constraints:
-- **Exact method**: Only needs EmptyInput and NonPositiveValue errors
-- **Approximation methods**: Need additional ValueTooSmall error for values < 1.0
-- **Associated type approach**: Avoids forcing exact method to expose impossible error variants
-
-### Second Commit: Pure Evaluation Framework
-Build evaluation system with no presentation logic:
-- **Pure evaluation function** - Takes exact values, approximation values, returns statistics
-- **Test data generator** - Pure function returning Vec<Vec<f64>>
-- **Statistics struct** - Simple data container with no formatting methods
-- **Main.rs handles everything else** - Method names, printing, formatting
-
-### Test Data Generator
-Single pure function with injectable randomness and method-specific constraints:
+### Trait-Only Public API
 ```rust
-fn generate_test_data<R: Rng>(
-    rng: &mut R,
-    num_tests: usize,
-    min_value: f64,
-    max_value: f64
-) -> Vec<Vec<f64>>
+// traits.rs
+pub trait EstimateGeometricMean {
+    type Error: std::error::Error;
+    fn estimate_geometric_mean(&self, values: &[f64]) -> Result<f64, Self::Error>;
+}
+```
+**Rationale**: Our evaluator should be able to evaluate _any_ estimation method, we'll use traits to allow this.
+
+#### Associated Error Types
+Different methods have different input constraints:
+- **Exact method**: EmptyInput, NonPositiveValue
+- **Approximation methods**: EmptyInput, NonPositiveValue, ValueTooSmall
+**Rationale**: Avoids forcing impossible error variants on exact method.
+
+#### Testing
+
+All tests for estimated methods use trait interface exclusively - internal functions for approximations should be set to private.
+No new tests are required in estimation modules.
+The exact method should have just a handful of tests that confirms that the exported geometric_mean function and the trait implementation are identical.
+
+**Rationale**: Trait is the public API, must be proven correct. Code not tested is not exposed, code that's exposed is tested.
+
+### Evaluation Module
+
+The evaluator module only has the following public interface.
+This module does _absolutely no_ formatting or printing, just pure statistical analysis.
+
+```rust
+pub fn evaluate_estimate<R: Rng, T: EstimateGeometricMean>(rng: &mut R, method: T, min: f64, max: f64, num_tests: usize) -> Results
 ```
 
-#### RNG Injection Rationale
-Using `rand::Rng` trait provides:
-- **Deterministic testing**: Pass seeded RNG like `StdRng::seed_from_u64(42)`
-- **No global state**: Pure functional approach, easier to test
-- **Flexibility**: Could use different RNG implementations if needed
-- **Testability**: Unit tests with predictable, repeatable randomness
+This method should iterate in place or steam or fold to prevent allocation of large lists of of tests inputs or outputs.
+It accepts a min and a max, because our estimation methods don't support the full range of finite floats, even though the exact method does.
 
-#### Test Range Rationale
-Different methods have different valid input ranges:
-- **Exact method**: All positive values (min_value ≥ ε > 0)
-- **Approximation methods**: Values ≥ 1.0 (min_value ≥ 1.0)
-- **Evaluator approach**: Accept min/max parameters to respect method constraints
+The primary property test here is that when evaluating the exact method _as_ the estimate, the result should be perfect.
 
-### Evaluation Function
-Single pure function:
+#### Simplified Statistics
 ```rust
-fn evaluate_accuracy(exact_results: &[f64], approximation_results: &[f64]) -> AccuracyStats
-```
-
-Note: The evaluator internally calls `exact::geometric_mean` directly for comparison, but the exact method also implements the trait for consistency and self-testing.
-
-### Statistics Container
-Simple data struct:
-```rust
-struct AccuracyStats {
+pub struct Results {
     mean_absolute_relative_error: f64,
-    success_rate: f64,
     total_tests: usize,
 }
 ```
+
+More summary statistics will be added in future changes.
+The goal of this change is to set the stage.
+
+## Comparison
+
+Direct comparison only occurs in the main method, as very simple print out.
+Iteration count will be hard-coded.
+In the future a more robust interface will be offered, we're just looking to set the stage.
+
+No tests here, this is a dead simple demo.
+
+## Testing Strategy
+- **Prefer property tests** - Better bang for the buck
+- **Example-based tests are still valuable** - Better for validating key special cases, and reader-optimized examples
+- **Don't disguise example-based as property** - Just make those regular unit tests
 
 ## Rejected Alternatives
 
@@ -111,64 +92,5 @@ struct AccuracyStats {
 1. **Fixed seed parameter** - Less flexible, global state concerns
 2. **Thread-local RNG** - Global state, harder to test deterministically
 
-## Testing Strategy
-
-### Evaluator Testing Requirements
-The evaluation module contains pure functions that are critical for correctness.
-All functions must be thoroughly tested to ensure reliable comparison results.
-
-### Test Data Generator Testing
-- **Deterministic output**: Same seed produces identical test data across runs
-- **Range validation**: Generated values respect min/max bounds
-- **Set size validation**: Generated sets have correct sizes (2-10 values)
-- **Boundary values**: min_value, max_value, exactly 2 and 10 element sets
-
-### Accuracy Evaluation Testing
-- **Perfect approximation**: When exact == approximation, relative error = 0
-- **Known error cases**: Hand-calculated examples with expected metrics
-- **Success rate boundaries**: Test 0.1x and 10x ratio thresholds precisely
-- **Single test case**: Arrays with length 1
-- **Identical values**: All exact and approximation values are the same
-- **Division by zero protection**: Ensure exact values are never zero
-
-### Test Implementation Approach
-- **Unit tests for pure functions**: Each function tested in isolation
-- **Property-based tests**: Use QuickCheck for boundary conditions and input validation
-
-### Expected Test Coverage
-- **generate_test_data()**: Range validation, determinism, set sizes, boundary values
-- **evaluate_accuracy()**: Error calculations, success rate logic, known cases, boundary conditions
-- **AccuracyStats**: Data structure correctness
-
-## Expected Deliverables
-
-### Core Implementation
-- Add evaluation functionality to existing main.rs
-- All presentation logic in main.rs
-- Pure functions in evaluation module
-
-### Testing Implementation
-- Comprehensive unit tests for evaluation module
-- Property-based tests for boundary conditions and input validation
-
-## Success Criteria
-
-### Functional Requirements
-- Minimal trait interface focused only on estimation
-- Pure evaluation functions with no side effects
-- Exact method used directly without trait wrapper
-- Clear separation: evaluation logic vs presentation logic
-- Foundation ready for easy extension
-
-### Quality Requirements
-- No printing/formatting in evaluation module
-- Consistent with existing code style and error handling
-- Reproducible results with fixed random seed
-- All presentation decisions made in main.rs
-
-### Testing Requirements
-- All evaluation functions have comprehensive unit tests
-- Property-based tests verify mathematical correctness
-- Test coverage includes edge cases and boundary conditions
-- Deterministic test data generation verified
-- Success rate calculation accuracy validated
+### Comparison instead of Evaluation module
+1. **Compare and Evaluate simultaneously** - Greater decoupling gives greater flexibility
