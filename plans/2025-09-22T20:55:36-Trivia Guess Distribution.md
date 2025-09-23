@@ -2,8 +2,10 @@
 
 ## Overview
 
-Implement a `trivia_guess` module that generates realistic trivia-style number guesses on an exponential scale.
+Implement a `trivia_guess` module that generates realistic trivia-style number guesses using a log-normal distribution around the correct answer.
 This is foundational infrastructure for Practice Mode, enabling simulation of human guessing patterns for testing and training purposes.
+
+Unlike naive uniform distributions, real trivia guesses cluster around the correct answer with log-normal distribution, where the variance reflects the collective knowledge and uncertainty of the guessing group.
 
 ## Motivation
 
@@ -23,11 +25,27 @@ The trivia_guess generator enables:
 The module should provide a `TriviaGuessDistribution` struct that implements the `Distribution<u64>` trait from the rand crate.
 This follows idiomatic Rust patterns and integrates seamlessly with the existing randomness ecosystem.
 
+**Interface Signature**:
+```rust
+TriviaGuessDistribution::new(correct_answer: u64, log_std_dev: f64) -> Result<Self, TriviaGuessDistributionError>
+```
+
+**Parameter Definition**:
+- `correct_answer`: The true answer that human guesses should cluster around
+- `log_std_dev`: Standard deviation in the natural logarithmic domain (ln), representing uncertainty in orders of magnitude
+
+**Uncertainty Factor Interpretation**:
+- `log_std_dev = 0.5`: Guesses span roughly ±1.6× the correct answer (68% within ~0.6× to 1.6× correct answer)
+- `log_std_dev = 1.0`: Guesses span roughly ±2.7× the correct answer (68% within ~0.37× to 2.7× correct answer)
+- `log_std_dev = 1.5`: Guesses span roughly ±4.5× the correct answer (68% within ~0.22× to 4.5× correct answer)
+
+This provides intuitive control over group knowledge: smaller values represent more informed guessing groups, larger values represent groups with greater uncertainty about the correct order of magnitude.
+
 **Design Requirements**:
 - Implement `Distribution<u64>` trait for integration with rand ecosystem
 - Stateless sampling for thread safety and composability
-- Maximum value stored in distribution struct, validated at construction time
-- Single responsibility: define how to sample trivia-realistic u64 values
+- Correct answer and logarithmic standard deviation stored in distribution struct, validated at construction time
+- Single responsibility: define how to sample trivia-realistic u64 values around a known correct answer
 - Composable with other distributions and rand functionality
 - Generate plain u64 values directly (no wrapper types)
 
@@ -57,50 +75,76 @@ The generator implements trivia-realistic rounding based on the first digit.
 
 ### Generation Algorithm
 
-#### Phase 1: Exponential Scale Selection
-Generate a value uniformly on the logarithmic scale between 1 and `max_value`, then convert to integer. This ensures that values are distributed exponentially rather than linearly, matching how trivia questions often span multiple orders of magnitude.
+#### Phase 1: Log-Normal Generation Around Correct Answer
+Generate a value from a log-normal distribution with:
+- **Mean**: `ln(correct_answer)` (distribution centered on the correct answer in log space)
+- **Standard Deviation**: `log_std_dev` (explicit standard deviation in natural log domain)
 
-#### Phase 2: Round to Trivia-Realistic Value
-Apply rounding rules based on the first digit of the generated integer value.
+This models realistic human guessing behavior where people cluster around the true value with log-normal uncertainty. The logarithmic standard deviation directly controls the spread in orders of magnitude, providing precise mathematical control over group knowledge levels.
+
+#### Phase 2: Round to Trivia-Realistic Value in Logarithmic Domain
+Apply rounding rules in the logarithmic domain to preserve mathematical relationships, then convert back to linear space.
 
 **Required Behavior**:
-1. Extract the first digit from the integer value
-2. Apply appropriate rounding rule based on first digit
-3. Ensure result doesn't exceed `max_value`
-4. Handle edge cases (values of 1, values near `max_value`)
+1. Convert raw log-normal sample to logarithmic representation
+2. Apply appropriate rounding rule in log space based on magnitude and (hypothetical linear space) first digit
+3. Convert rounded log value back to integer
+4. Handle edge cases (values near 1, extreme outliers)
 
 ## Rounding Behavior Requirements
 
-### First Digit Extraction
-The implementation must efficiently determine the first digit of any positive integer in constant time using mathematical operations rather than iterative approaches like loops or string manipulation.
+### Mathematical Correctness Through Logarithmic Domain Rounding
 
-**Performance requirement**: Use logarithmic operations to calculate order of magnitude and extract the first digit mathematically, avoiding any iterative division or character-based approaches.
+**Critical Insight**: All rounding must occur in the logarithmic domain to preserve mathematical relationships. Linear-domain rounding destroys the geometric relationships that make trivia-realistic rounding meaningful.
 
-### Rounding Rule Application
-The implementation must apply different rounding rules based on the first digit:
+This approach ensures that the spacing between valid guesses reflects proportional rather than absolute differences, which matches how humans conceptualize magnitude differences in trivia scenarios.
 
-- **First digit 1**: Round to steps of 0.5 in the leading digit position
-- **First digits 2-4**: Round to exactly two significant digits
-- **First digits 5+**: Round to half-steps in the leading digit position
+### Implementation Complexity
 
-The rounding must preserve the appropriate precision level for each case while maintaining mathematical consistency and producing valid integers.
+Rounding in logarithmic space to irregular intervals presents significant implementation challenges:
+- Converting trivia rounding rules (designed for linear representation) into equivalent logarithmic operations
+- Handling boundary conditions where log-space rounding crosses magnitude boundaries
+- Ensuring precision and avoiding floating-point errors in the conversion chain
+
+### Rounding Rule Application in Log Space
+
+The implementation must apply different rounding rules based on the first digit, but perform all actual rounding operations in logarithmic domain:
+
+- **First digit 1**: Round to steps of 0.05 in the leading digit position (converted to equivalent log-space intervals)
+- **First digits 2-4**: Round to exactly two significant digits (converted to equivalent log-space intervals)
+- **First digits 5+**: Round to half-steps in the leading digit position (converted to equivalent log-space intervals)
+
+The rounding must preserve the appropriate precision level for each case while maintaining mathematical consistency throughout the logarithmic domain operations.
 
 ## Property-Based Testing Strategy
 
 ### Core Mathematical Properties
 
 #### Generation Properties
-1. **Range Bounds**: `1 <= guess <= max_value` for any successfully constructed distribution
+1. **Range Bounds**: All generated values should be positive integers
 2. **Infallible Sampling**: Once constructed, `sample()` method never fails
+3. **Distribution Shape**: Generated samples should follow log-normal distribution around correct answer
 
 #### Rounding Rule Properties
 1. **Rounding Consistency**: Rounding the same raw value should always produce the same result
-2. **Magnitude Preservation**: Rounding should never change the order of magnitude by more than one step
+2. **Trivia-Realistic Output**: All rounded values should conform to the trivia rounding rules
+3. **Log-Domain Preservation**: Rounding should preserve proportional relationships when viewed logarithmically
+
+#### Statistical Validation with Fixed Seeds
+
+**Critical Requirement**: Use non-cherry-picked fixed seeds for statistical validation to ensure tests are reproducible but not biased toward favorable outcomes.
+
+**Statistical Properties to Validate**:
+1. **Central Tendency**: Geometric mean of large sample should approximate correct answer
+2. **Distribution Shape**: Sample distribution should exhibit log-normal characteristics
+3. **Standard Deviation**: Measured standard deviation in log domain should approximate `log_std_dev` parameter
+4. **Uncertainty Scaling**: Higher `log_std_dev` values should produce proportionally wider distributions in log space
+5. **Boundary Behavior**: Distribution should handle extreme correct answers gracefully
 
 #### Boundary Condition Properties
-1. **Edge Case: max_value = 1**: Distribution should construct successfully and always return 1 (Example-based test)
-2. **Edge Case: max_value just above power of 10**: Should handle transitions cleanly (Example-based test)
-3. **Edge Case: max_value very large**: Should not overflow or panic
+1. **Edge Case: correct_answer = 1**: Distribution should construct successfully and produce realistic small-number guesses
+2. **Edge Case: very large correct answers**: Should handle values near u64::MAX without overflow
+3. **Edge Case: log_std_dev extremes**: Should handle both very certain (small log_std_dev) and very uncertain (large log_std_dev) scenarios
 
 ### Test Organization
 
@@ -154,22 +198,30 @@ Tests should live in the same file as the code they test.
 The module should define appropriate error types for constructor validation.
 
 ### Error Cases
-1. **max_value = 0**: Constructor returns `InvalidMaxValue` error
-2. **Internal overflow during construction**: Constructor returns `GenerationFailed` error (though this should be extremely rare with u64)
+1. **correct_answer = 0**: Constructor returns `InvalidCorrectAnswer` error
+2. **log_std_dev <= 0 or NaN**: Constructor returns `InvalidLogStdDev` error
+3. **log_std_dev extremely large**: Constructor returns `LogStdDevTooLarge` error (to prevent numerical instability and unrealistic distributions)
 
 ### Recovery Strategy
 - Validation at construction time prevents all runtime errors
 - Once constructed, distribution is guaranteed to work correctly
 - Error messages should be descriptive for debugging
+- No runtime failures: sampling operations are infallible after successful construction
 
 ## Success Criteria
 
 1. **Functional Correctness**: All rounding rules produce expected outputs for known inputs
-2. **Property Validation**: All mathematical properties hold under QuickCheck testing
-3. **Performance Acceptable**: Generation performance supports high-volume testing
-4. **Integration Ready**: Module integrates cleanly with existing codebase patterns
-5. **Comprehensive Testing**: Edge cases and error conditions are properly handled
-6. **Clear Documentation**: Module is well-documented with usage examples
-7. **Ergonomic API**: Constructor handles validation, `sample()` method is simple and infallible
+2. **Mathematical Rigor**: Log-domain rounding preserves geometric relationships correctly
+3. **Statistical Validity**: Distribution exhibits proper log-normal characteristics around correct answer
+4. **Property Validation**: All mathematical properties hold under QuickCheck testing with fixed seeds
+5. **Performance Acceptable**: Generation performance supports high-volume testing
+6. **Comprehensive Testing**: Edge cases and error conditions are properly handled
+7. **Clear Documentation**: Module is well-documented with usage examples
+8. **Ergonomic API**: Constructor handles validation, `sample()` method is simple and infallible
+9. **Implementation Elegance**: Code must be elegant and self-describing to optimize for review
+
+### Implementation Excellence Requirement
+
+**Critical**: Given the mathematical complexity of logarithmic domain rounding to irregular intervals, the implementation must prioritize elegance and self-description. A correct but opaque implementation is insufficient.  We must optimize for review _because_ the problem is difficult.
 
 This trivia_guess module will serve as essential infrastructure for Practice Mode while following the project's principles of strong testing, clear abstraction, and evolutionary design.
