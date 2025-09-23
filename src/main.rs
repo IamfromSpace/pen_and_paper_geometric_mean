@@ -28,6 +28,9 @@ fn main() {
     let exact_results = evaluate_estimate::<_, ExactGeometricMean>(&mut rng, min_value, max_value, num_tests);
     println!("Exact Method:");
     println!("  Mean Absolute Relative Error: {:.6e}", exact_results.mean_absolute_relative_error);
+    println!("  Worst Case Error: {:.6e}", exact_results.worst_case_error);
+    println!("  Worst Case Overestimate: {:.6e}", exact_results.worst_case_overestimate);
+    println!("  Overall Bias: {:.6e}", exact_results.overall_bias);
     println!("  Valid Tests: {}", exact_results.total_tests);
     println!();
 
@@ -36,6 +39,9 @@ fn main() {
     let log_linear_results = evaluate_estimate::<_, LogLinearApproximation>(&mut rng, min_value, max_value, num_tests);
     println!("Log-Linear Interpolation:");
     println!("  Mean Absolute Relative Error: {:.6e}", log_linear_results.mean_absolute_relative_error);
+    println!("  Worst Case Error: {:.6e}", log_linear_results.worst_case_error);
+    println!("  Worst Case Overestimate: {:.6e}", log_linear_results.worst_case_overestimate);
+    println!("  Overall Bias: {:.6e}", log_linear_results.overall_bias);
     println!("  Valid Tests: {}", log_linear_results.total_tests);
     println!();
 
@@ -44,6 +50,9 @@ fn main() {
     let table_results = evaluate_estimate::<_, TableBasedApproximation>(&mut rng, min_value, max_value, num_tests);
     println!("Table-Based Approximation:");
     println!("  Mean Absolute Relative Error: {:.6e}", table_results.mean_absolute_relative_error);
+    println!("  Worst Case Error: {:.6e}", table_results.worst_case_error);
+    println!("  Worst Case Overestimate: {:.6e}", table_results.worst_case_overestimate);
+    println!("  Overall Bias: {:.6e}", table_results.overall_bias);
     println!("  Valid Tests: {}", table_results.total_tests);
     println!();
 
