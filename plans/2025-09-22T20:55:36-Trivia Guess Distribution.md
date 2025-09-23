@@ -33,22 +33,27 @@ This follows idiomatic Rust patterns and integrates seamlessly with the existing
 
 ### Rounding Rules by Magnitude
 
-The generator implements trivia-realistic rounding based on the first digit:
+The generator implements trivia-realistic rounding based on the first digit.
+
+**Leading digit position terminology**: For a number like 1250, the "leading digit position" refers to the magnitude of the first digit (1000 in this case). A step of 0.05 in the leading digit position means 0.05 × 1000 = 50, so valid values would be 1000, 1050, 1100, 1150, etc.
 
 #### Numbers Starting with 1
-- **Rule**: Steps of 0.5 in the leading digit position
+- **Rule**: Steps of 0.05 in the leading digit position
 - **Examples**: 100, 105, 110, 115, 120, 125, 130...
 - **Examples**: 1000, 1050, 1100, 1150, 1200, 1250, 1300...
+- **Counter-examples**: NOT 101, 102, 103, 104, 106, 107, 108, 109, 111, 112...
 
 #### Numbers Starting with 2-4
 - **Rule**: Two significant digits allowed
 - **Examples**: 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30...
 - **Examples**: 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300...
+- **Counter-examples**: NOT 205, 215, 225, 235, 245, 255, 265, 275, 285, 295...
 
 #### Numbers Starting with 5+
 - **Rule**: Half-steps in the leading digit position
 - **Examples**: 500, 550, 600, 650, 700, 750, 800, 850, 900, 950...
 - **Examples**: 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500...
+- **Counter-examples**: NOT 510, 520, 530, 540, 560, 570, 580, 590, 610, 620...
 
 ### Generation Algorithm
 
@@ -67,7 +72,9 @@ Apply rounding rules based on the first digit of the generated integer value.
 ## Rounding Behavior Requirements
 
 ### First Digit Extraction
-The implementation must determine the first digit of any positive integer.
+The implementation must efficiently determine the first digit of any positive integer in constant time using mathematical operations rather than iterative approaches like loops or string manipulation.
+
+**Performance requirement**: Use logarithmic operations to calculate order of magnitude and extract the first digit mathematically, avoiding any iterative division or character-based approaches.
 
 ### Rounding Rule Application
 The implementation must apply different rounding rules based on the first digit:
