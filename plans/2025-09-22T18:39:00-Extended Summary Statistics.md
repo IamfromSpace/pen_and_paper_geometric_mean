@@ -74,9 +74,11 @@ Add QuickCheck properties to verify mathematical relationships:
 - Add unit tests for edge cases
 - Verify all approximation methods work with new metrics
 
-### Phase 3: Update Display (Future)
-- Main method will eventually need updates to display new metrics
-- Keep this separate from core statistical computation
+### Phase 3: Update Display (Simple)
+- Add extended statistics to existing main.rs output in the simplest way possible
+- Display worst_case_error, worst_case_overestimate, and overall_bias for each method
+- Keep the same basic structure and formatting as current demo
+- More comprehensive CLI features (formatting, analysis, etc.) will be implemented at a later date
 
 ## Design Constraints
 
