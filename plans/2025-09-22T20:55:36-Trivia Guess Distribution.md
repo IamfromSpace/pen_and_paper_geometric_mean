@@ -101,6 +101,34 @@ Apply rounding rules in the logarithmic domain to preserve mathematical relation
 
 This approach ensures that the spacing between valid guesses reflects proportional rather than absolute differences, which matches how humans conceptualize magnitude differences in trivia scenarios.
 
+#### Critical Mathematical Requirements
+
+**Logarithmic vs Linear Rounding Distinction:**
+
+The implementation MUST use logarithmic distance for rounding decisions, not linear distance.
+
+**Key Test Cases to Validate Logarithmic Rounding:**
+
+1. **Basic logarithmic midpoint**:
+   - Between 100,000 and 105,000, the log midpoint is ~102,469.5
+   - Requirement: 102,469 → 100,000, 102,470 → 105,000
+
+2. **Cross-magnitude rounding** (CRITICAL):
+   - Between 195,000 and 200,000, the log midpoint is ~197,484.2
+   - Requirement: 197,484 → 195,000 (stays in "first digit 1" rule)
+   - Requirement: 197,485 → 200,000 (jumps to "first digit 2" rule)
+   - This tests that the algorithm correctly handles rounding across different rule sets
+
+3. **Rule transitions at scale boundaries**:
+   - Between 950,000 and 1,000,000 (both use "5+" rule but different magnitudes)
+   - Between 450,000 and 500,000 (transitions from "2-4" rule to "5+" rule)
+
+**Requirements Summary:**
+- Rounding distance MUST be measured in logarithmic space: |ln(input) - ln(candidate)|
+- The implementation MUST handle cases where rounding crosses between different first-digit rule sets
+- Magnitude transitions (e.g., 999,000 area) must be handled correctly
+- Perfect certainty (log_std_dev = 0.0) must produce deterministic results based on logarithmic proximity
+
 ### Implementation Complexity
 
 Rounding in logarithmic space to irregular intervals presents significant implementation challenges:
