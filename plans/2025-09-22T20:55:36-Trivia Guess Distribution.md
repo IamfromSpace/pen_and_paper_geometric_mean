@@ -35,6 +35,7 @@ TriviaGuessDistribution::new(correct_answer: u64, log_std_dev: f64) -> Result<Se
 - `log_std_dev`: Standard deviation in the natural logarithmic domain (ln), representing uncertainty in orders of magnitude
 
 **Uncertainty Factor Interpretation**:
+- `log_std_dev = 0.0`: Perfect certainty - always returns the correct answer rounded to valid trivia format
 - `log_std_dev = 0.5`: Guesses span roughly ±1.6× the correct answer (68% within ~0.6× to 1.6× correct answer)
 - `log_std_dev = 1.0`: Guesses span roughly ±2.7× the correct answer (68% within ~0.37× to 2.7× correct answer)
 - `log_std_dev = 1.5`: Guesses span roughly ±4.5× the correct answer (68% within ~0.22× to 4.5× correct answer)
@@ -48,6 +49,7 @@ This provides intuitive control over group knowledge: smaller values represent m
 - Single responsibility: define how to sample trivia-realistic u64 values around a known correct answer
 - Composable with other distributions and rand functionality
 - Generate plain u64 values directly (no wrapper types)
+- **No public accessor methods**: Do not expose internal fields or state via public methods (YAGNI principle)
 
 ### Rounding Rules by Magnitude
 
@@ -174,6 +176,27 @@ Tests should live in the same file as the code they test.
 - Add boundary condition tests
 - Ensure all properties pass consistently
 
+#### Key Validation Tests
+The following three specific tests are critical for validating the implementation:
+
+1. **Three-Digit Sample Validation Test**:
+   - Create distribution with `correct_answer=316, log_std_dev=1.151`
+   - Sample many values, filter to three-digit results (100-999)
+   - Verify all three-digit samples are members of the complete valid trivia number set
+   - This validates end-to-end correctness of the log-normal generation + rounding pipeline
+
+2. **Deterministic Perfect Certainty Test**:
+   - For each valid trivia number at various scales, create distribution with `log_std_dev=0.0`
+   - Verify that sampling always returns the correct answer (deterministic rounding)
+   - This validates that zero uncertainty produces perfectly predictable results
+
+3. **Boundary Rounding Between Adjacent Valid Values**:
+   - For adjacent pairs of valid trivia numbers, find their geometric middle point
+   - Scale the test values (e.g., `middle_value × 10000` to test 5-6 digit numbers like 324,650 and 324,680)
+   - Create test points slightly below and above the scaled geometric middle with `log_std_dev=0.0`
+   - Verify both test points round to one of the two adjacent scaled valid values and to different values
+   - This validates that rounding boundaries work correctly at the logarithmic middle point between valid values
+
 ### Phase 4: Documentation
 - Add documentation for public methods
 - Add module-level documentation describing the purpose and usage
@@ -199,8 +222,8 @@ The module should define appropriate error types for constructor validation.
 
 ### Error Cases
 1. **correct_answer = 0**: Constructor returns `InvalidCorrectAnswer` error
-2. **log_std_dev <= 0 or NaN**: Constructor returns `InvalidLogStdDev` error
-3. **log_std_dev extremely large**: Constructor returns `LogStdDevTooLarge` error (to prevent numerical instability and unrealistic distributions)
+2. **log_std_dev < 0 or NaN**: Constructor returns `InvalidLogStdDev` error (note: `log_std_dev = 0.0` is explicitly allowed for deterministic rounding)
+3. **log_std_dev > 50.0**: Constructor returns `LogStdDevTooLarge` error (prevents floating point overflow/underflow: extreme tail events at 6σ could push exp() beyond f64 range, causing mathematical instability)
 
 ### Recovery Strategy
 - Validation at construction time prevents all runtime errors
@@ -222,6 +245,8 @@ The module should define appropriate error types for constructor validation.
 
 ### Implementation Excellence Requirement
 
-**Critical**: Given the mathematical complexity of logarithmic domain rounding to irregular intervals, the implementation must prioritize elegance and self-description. A correct but opaque implementation is insufficient.  We must optimize for review _because_ the problem is difficult.
+**Critical**: Given the mathematical complexity of logarithmic domain rounding to irregular intervals, the implementation must prioritize elegance and self-description. A correct but opaque implementation is insufficient. We must optimize for review _because_ the problem is difficult.
+
+**Comments are not a shortcut**: While comments should absolutely be used to highlight surprising, unexpected, or subtle details, the primary goal is to write code that doesn't need extensive commenting in the first place. Comments should explain _why_ something is done when it's not obvious from the _what_.
 
 This trivia_guess module will serve as essential infrastructure for Practice Mode while following the project's principles of strong testing, clear abstraction, and evolutionary design.
