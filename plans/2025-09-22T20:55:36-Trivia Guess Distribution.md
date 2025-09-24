@@ -84,14 +84,17 @@ Generate a value from a log-normal distribution with:
 
 This models realistic human guessing behavior where people cluster around the true value with log-normal uncertainty. The logarithmic standard deviation directly controls the spread in orders of magnitude, providing precise mathematical control over group knowledge levels.
 
-#### Phase 2: Round to Trivia-Realistic Value in Logarithmic Domain
+#### Phase 2: Round to Trivia-Realistic Value in Logarithmic Domain (O(1) Algorithm Required)
 Apply rounding rules in the logarithmic domain to preserve mathematical relationships, then convert back to linear space.
 
 **Required Behavior**:
 1. Convert raw log-normal sample to logarithmic representation
-2. Apply appropriate rounding rule in log space based on magnitude and (hypothetical linear space) first digit
-3. Convert rounded log value back to integer
-4. Handle edge cases (values near 1, extreme outliers)
+2. **Efficiently determine** appropriate rounding rule in log space based on magnitude and (hypothetical linear space) first digit
+3. **Directly compute** the correct rounded value using mathematical formulas, not search
+4. Convert rounded log value back to integer
+5. Handle edge cases (values near 1, extreme outliers)
+
+**Critical Performance Constraint**: This phase must be implemented as a direct mathematical computation, NOT as a search through pre-generated candidates. The algorithm must determine the correct trivia-rounded value in constant time regardless of magnitude.
 
 ## Rounding Behavior Requirements
 
@@ -243,6 +246,26 @@ The following three specific tests are critical for validating the implementatio
 - **Numeric operations only**: No string manipulation or other inefficient operations
 - **Engineering excellence**: Well-designed algorithms appropriate for the mathematical operations
 
+#### Critical Algorithmic Efficiency Requirements
+
+**PROHIBITED APPROACHES** (these violate O(1) requirement):
+- **No candidate generation**: Do not generate lists/arrays of possible valid trivia numbers and search through them
+- **No brute force search**: Do not iterate through potential values to find the closest match
+- **No linear scanning**: Do not examine multiple candidates per sample
+
+**REQUIRED APPROACH** (achieves true O(1) performance):
+- **Direct mathematical computation**: Given a log-domain value, directly compute which "interval" or "bucket" it falls into based on trivia rounding rules
+- **At most 2 candidates**: Compute exactly the 2 nearest valid trivia values (above and below) for the determined interval
+- **Direct selection**: Choose between these 2 values based on logarithmic distance without iteration
+- **Algorithmic rounding**: Use mathematical formulas to determine rounding boundaries, not enumeration
+
+**Implementation Strategy**:
+1. **Interval Detection**: From log-domain input, algorithmically determine magnitude and first-digit rule type in O(1)
+2. **Boundary Computation**: Mathematically compute the boundaries of the rounding interval for that rule type in O(1)
+3. **Direct Rounding**: Apply logarithmic rounding within that specific interval in O(1)
+
+This ensures that each sample requires only a constant number of arithmetic operations regardless of the magnitude or complexity of trivia rounding rules.
+
 ## Error Handling Strategy
 
 ### Input Validation
@@ -265,7 +288,7 @@ The module should define appropriate error types for constructor validation.
 2. **Mathematical Rigor**: Log-domain rounding preserves geometric relationships correctly
 3. **Statistical Validity**: Distribution exhibits proper log-normal characteristics around correct answer
 4. **Property Validation**: All mathematical properties hold under QuickCheck testing with fixed seeds
-5. **Performance Acceptable**: Generation performance supports high-volume testing
+5. **O(1) Performance Validated**: Each sample generation must complete in constant time with no candidate iteration or brute force search - performance must be independent of magnitude and number of possible trivia values
 6. **Comprehensive Testing**: Edge cases and error conditions are properly handled
 7. **Clear Documentation**: Module is well-documented with usage examples
 8. **Ergonomic API**: Constructor handles validation, `sample()` method is simple and infallible
