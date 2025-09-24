@@ -3,6 +3,7 @@ mod log_linear;
 mod table_based;
 mod traits;
 mod evaluation;
+mod trivia_guess;
 
 use rand::SeedableRng;
 use rand::rngs::StdRng;
