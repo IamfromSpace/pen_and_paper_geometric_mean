@@ -3,6 +3,7 @@
 ## This Project
 
 This project seeks to compare approaches for estimating the geometric mean via pen and paper.
+It also provides a practice mode, that checks timing and accuracy of randomly generated scenarios.
 
 ## Motivation
 
@@ -105,3 +106,11 @@ To ensure correctness while maximizing speed, we use the Rust programming langua
 While a language like Haskell can frequently give us even greater correctness guarantees, logarithms cannot be calculated with perfect precision in any language.
 
 We use LEAN to formally prove error bounds for the pen-and-paper methods.
+
+## Practice Mode
+
+Practice mode is a CLI tool that presents users with a set off guesses consistent with those seen in trivia games, expecting the user to use a particular estimation method to find the geometric mean.
+It starts a timer, and waits for the user to input their estimated geometric mean, stopping it on submission.
+The time taken is returned, as well as a judge of correctness.
+In some methods, it's possible for the user to beat the algorithm's estimate, so being closer to the exact geometric mean is considered success, and called out specially.
+If the user is incorrect, a step by step calculation is printed, so the user can understand their mistake.
