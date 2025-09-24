@@ -96,6 +96,33 @@ Apply rounding rules in the logarithmic domain to preserve mathematical relation
 
 **Critical Performance Constraint**: This phase must be implemented as a direct mathematical computation, NOT as a search through pre-generated candidates. The algorithm must determine the correct trivia-rounded value in constant time regardless of magnitude.
 
+#### O(1) Algorithm Solution: The Bracketing Insight
+
+**Mathematical Foundation**: The key insight enabling true O(1) performance is that `ln()` is strictly monotonic (always increasing). Therefore, if a target value falls between two consecutive valid candidates in linear space, it must also fall between them in logarithmic space. This means the log-closest candidate is guaranteed to be one of those two linear neighbors!
+
+**Algorithm Sketch**:
+1. **Linear Interval Detection** (O(1)): Given target value and step size, compute which interval `[k×step, (k+1)×step]` contains the target using simple arithmetic: `k = floor((target - base) / step)`
+
+2. **Candidate Computation** (O(1)): Calculate the two candidates that bracket the target:
+   - `candidate_low = base + k × step`
+   - `candidate_high = base + (k+1) × step`
+
+3. **Logarithmic Distance Comparison** (O(1)): Evaluate which candidate is closer in log space:
+   - `log_distance_low = |log(target) - log(candidate_low)|`
+   - `log_distance_high = |log(target) - log(candidate_high)|`
+   - Return the candidate with smaller logarithmic distance
+
+**Why This Works**:
+- **Monotonicity Guarantee**: Since `ln()` preserves order, linear bracketing implies log bracketing
+- **Optimality**: The closest candidate in log space cannot be outside the linear interval
+- **Efficiency**: Only 2 candidates need evaluation, independent of total candidate count
+- **Generality**: Works for any arithmetic progression of valid values (steps of 0.05, 0.1, or 0.5)
+
+**Performance Characteristics**:
+- **Time Complexity**: O(1) - exactly 1 division, 2 additions, 2 logarithms, 1 comparison
+- **Space Complexity**: O(1) - no candidate storage or enumeration
+- **Independence**: Performance unaffected by magnitude or number of possible trivia values
+
 ## Rounding Behavior Requirements
 
 ### Mathematical Correctness Through Logarithmic Domain Rounding
