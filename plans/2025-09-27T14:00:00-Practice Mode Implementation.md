@@ -95,18 +95,19 @@ Thanks for practicing!
 - Correct answers uniformly distributed in log space within range
 - Problems generated using existing `TriviaGuessDistribution` with fixed parameters
 - Each problem guaranteed to be solvable by table method
+- **Range handling**: Use standard library Range types (e.g., `10..=100_000_000_000_u64`) to prevent min/max confusion
+- **Return format**: `start()` method returns tuple of `(guesses: Vec<u64>, active_session)` for immediate access to problem data
 
-### Success Criteria
-- **Correct**: User answer matches the estimation method result
+### Answer Evaluation
+Answer evaluation results expressed as enum with three distinct states:
+- **Correct**: User answer matches the estimation method result within tolerance
 - **Excellent**: User answer closer to exact geometric mean than estimation method result
-- Both conditions checked and reported independently
-- If the estimation and exact calculations are identical, report **Correct** instead of **Excellent**
-- Incorrect calculations end the practice problem and present the correct estimation result
+- **Incorrect**: User answer does not match estimation method result
 
-### Timing
-- Timer starts immediately when problem is displayed
-- Timer stops when valid answer submitted
-- Display precision to 0.1 seconds
+### Timing Requirements
+- **Duration type**: Use `std::time::Duration` throughout instead of raw seconds as `f64`
+- **Timer precision**: Maintain nanosecond precision internally, display to 0.1 seconds for user
+- **Timer lifecycle**: Start when problem displayed, stop when valid answer submitted
 
 ## Architecture
 
@@ -128,18 +129,17 @@ Core logic uses type states to enforce correct method call ordering:
 ### Testable Time Dependencies
 Abstract timing through trait to enable deterministic testing:
 
-- **Timer trait**: Monotonic time measurement with associated Instant type
-- **SystemTimer**: Production implementation using `std::time::Instant`
-- **MockTimer**: Test implementation with predictable, incrementing durations
+- **Timer trait**: Monotonic time measurement with associated Instant type, returns `Duration` for all time calculations
+- **SystemTimer**: Production implementation using `std::time::Instant` and `std::time::Duration`
+- **MockTimer**: Test-only implementation with predictable, incrementing durations (not public API)
 - **Validation**: Tests can verify correct instant usage and timing calculations
 
 ### CLI Layer Responsibilities
 - Create practice session with pure dependencies (RNG, SystemTimer, TableBasedApproximation)
-- Call `start()` with dynamic configuration for each problem
-- Display problem guesses from active problem
-- Prompt for user input and parse integers
-- Display results returned from `submit_answer()`
-- Formatting concerns, like rounding
+- Call `start()` with range-based configuration for each problem
+- Extract and display problem guesses from returned tuple
+- Prompt for user input and parse as `u64` (no floating point parsing needed)
+- Display results with Duration formatting (convert to seconds for display)
 - Handle continue/exit logic and session recreation
 - Manage I/O operations (stdin/stdout) - timing handled by core logic via Timer trait
 
@@ -150,9 +150,21 @@ Abstract timing through trait to enable deterministic testing:
 - **UI independence**: Core logic works with any interface (CLI, GUI, web, etc.)
 
 ### Error Handling
-- Invalid input: CLI layer validates and reprompts before calling core methods
-- Calculation failures: Returned as error results from core methods
-- Usage errors: Impossible due to type safety and consuming ownership
+
+#### Configuration Errors (Distinct enum variants)
+Configuration validation should provide specific error types:
+- **ZeroTeamSize**: Team size cannot be zero
+- **InvalidAnswerRange**: Answer range cannot be empty (min == max)
+
+#### Runtime Errors
+- **EstimationMethodFailure**: Underlying estimation method failed (wrap original error)
+- **DistributionFailure**: TriviaGuessDistribution creation failed (wrap original error)
+- **GeometricMeanFailure**: Exact geometric mean calculation failed (wrap original error)
+
+#### Input Processing
+- **CLI layer responsibility**: Validate and reprompt for user input before calling core methods
+- **Core layer responsibility**: Return structured errors for configuration and calculation failures
+- **Type safety**: Usage errors prevented by state machine design and consuming ownership
 
 ## Testing Strategy
 
@@ -184,10 +196,10 @@ Minimal testing since core logic is separate:
 ## Implementation Notes
 
 ### Existing Code Reuse
-- `TriviaGuessDistribution` for realistic guess generation in `start()` method
+- `TriviaGuessDistribution` for realistic guess generation in `start()` method (generates `u64` values directly)
 - `TableBasedApproximation` trait for method comparison in `submit_answer()`
-- `geometric_mean()` function for exact calculations in evaluation logic
-- Pure dependencies (RNG) injected at creation, dynamic config at `start()`
+- `geometric_mean()` function for exact calculations in evaluation logic (convert `u64` guesses to `f64` only for calculation)
+- Pure dependencies (RNG, Timer) injected at creation, range-based config at `start()`
 - Core logic remains pure, I/O handling isolated to CLI layer
 
 ### Future Extensibility
