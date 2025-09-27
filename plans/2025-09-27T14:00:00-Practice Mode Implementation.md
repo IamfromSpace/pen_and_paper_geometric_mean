@@ -7,9 +7,9 @@ Practice mode provides an interactive CLI tool for users to practice estimating 
 ## Requirements
 
 ### Core Functionality
-- Generate realistic practice problems using existing `TriviaGuessDistribution`
+- Generate realistic practice problems using pre-configured `TriviaGuessDistribution`
 - Time user responses from problem presentation to answer submission
-- Evaluate answers against exact geometric mean with defined tolerance
+- Evaluate answers: Correct if user answer equals floor(estimation_method_result) or ceiling(estimation_method_result)
 - Compare user performance to table-based approximation method
 - Loop indefinitely until user chooses to exit
 
@@ -88,21 +88,19 @@ Thanks for practicing!
 ### Fixed CLI Parameters (For Simplicity)
 - **Team size**: 4 guessers (realistic trivia scenario)
 - **Uncertainty**: log_std_dev = 4.0 (moderate spread matching existing tests)
-- **Answer range**: 10 to 100,000,000,000 (covers typical trivia magnitudes)
+- **Answer range**: 10 to 1,000,000,000 (1B max to avoid extremely large guesses)
 - **Method**: Table-based only (log-linear reserved for future iteration)
 
 ### Problem Generation
-- Correct answers uniformly distributed in log space within range
-- Problems generated using existing `TriviaGuessDistribution` with fixed parameters
-- Each problem guaranteed to be solvable by table method
-- **Range handling**: Use standard library Range types (e.g., `10..=100_000_000_000_u64`) to prevent min/max confusion
+- **Correct answers**: Randomly chosen in log space (uniform distribution over ln(10) to ln(1,000,000,000))
+- **Distribution creation**: Each problem creates new `TriviaGuessDistribution` with randomly chosen center point
 - **Return format**: `start()` method returns tuple of `(guesses: Vec<u64>, active_session)` for immediate access to problem data
 
 ### Answer Evaluation
-Answer evaluation results expressed as enum with three distinct states:
-- **Correct**: User answer matches the estimation method result within tolerance
-- **Excellent**: User answer closer to exact geometric mean than estimation method result
-- **Incorrect**: User answer does not match estimation method result
+Answer evaluation results expressed as enum with two distinct states:
+- **Correct**: User answer equals floor(estimation_method_result) or ceiling(estimation_method_result)
+- **Excellent**: User answer closer to exact geometric mean than the rounded estimation method result
+- **Incorrect**: User answer does not equal either floor or ceiling of estimation method result
 
 ### Timing Requirements
 - **Duration type**: Use `std::time::Duration` throughout instead of raw seconds as `f64`
@@ -115,7 +113,7 @@ Answer evaluation results expressed as enum with three distinct states:
 Practice mode splits into two layers to enable testing and future UI flexibility:
 
 - **`src/practice_mode.rs`**: Pure state machine with no I/O dependencies
-- **`src/cli/practice_mode.rs`**: CLI-specific rendering and input handling
+- **`src/cli/practice_mode.rs`**: CLI-specific rendering and input handling with dedicated formatting functions
 
 ### Type-Safe State Pattern
 Core logic uses type states to enforce correct method call ordering:
@@ -123,8 +121,9 @@ Core logic uses type states to enforce correct method call ordering:
 - **Type states**: `Ready` and `Active` prevent wrong method sequences
 - **Generic over estimation method**: Struct-level generic enables different methods while maintaining type safety
 - **Method flow**: `new()` → `start(config)` → `submit_answer()`
+- **Public API**: Only `new()`, `start()`, and `submit_answer()` methods are public
 - **Pure dependencies**: RNG and Timer injected at creation
-- **Dynamic config**: Problem parameters provided at start
+- **Random center selection**: `start()` randomly chooses correct answer in log space, then creates distribution
 
 ### Testable Time Dependencies
 Abstract timing through trait to enable deterministic testing:
@@ -136,12 +135,16 @@ Abstract timing through trait to enable deterministic testing:
 
 ### CLI Layer Responsibilities
 - Create practice session with pure dependencies (RNG, SystemTimer, TableBasedApproximation)
-- Call `start()` with range-based configuration for each problem
-- Extract and display problem guesses from returned tuple
+- Call `start()` with configuration for each problem
+- Extract and display problem guesses from returned tuple using dedicated formatting function
 - Prompt for user input and parse as `u64` (no floating point parsing needed)
-- Display results with Duration formatting (convert to seconds for display)
+- Display results using dedicated formatting function with Duration formatting
 - Handle continue/exit logic and session recreation
 - Manage I/O operations (stdin/stdout) - timing handled by core logic via Timer trait
+
+### CLI Formatting Functions
+- **`format_problem_display(guesses: &[u64]) -> String`**: Pure function for consistent guess presentation
+- **`format_results_display(user_answer: u64, exact_mean: f64, estimation_result: u64, duration: Duration, evaluation: AnswerEvaluation) -> String`**: Pure function for consistent result presentation
 
 ### Testing Benefits
 - **Pure functions**: Test complete practice flows without any I/O mocking
@@ -154,17 +157,18 @@ Abstract timing through trait to enable deterministic testing:
 #### Configuration Errors (Distinct enum variants)
 Configuration validation should provide specific error types:
 - **ZeroTeamSize**: Team size cannot be zero
-- **InvalidAnswerRange**: Answer range cannot be empty (min == max)
+- **InvalidAnswerRange**: Answer range cannot be empty (min >= max)
 
-#### Runtime Errors
-- **EstimationMethodFailure**: Underlying estimation method failed (wrap original error)
-- **DistributionFailure**: TriviaGuessDistribution creation failed (wrap original error)
-- **GeometricMeanFailure**: Exact geometric mean calculation failed (wrap original error)
+#### Core Logic Errors
+Core logic returns simple Result types without composite RuntimeError enum:
+- **start()**: Returns `Result<(Vec<u64>, ActiveSession), ConfigurationError>`
+- **Estimation/Distribution failures**: Handled internally, should not occur with valid configuration
+- **Type safety**: Usage errors prevented by state machine design and consuming ownership
 
 #### Input Processing
 - **CLI layer responsibility**: Validate and reprompt for user input before calling core methods
-- **Core layer responsibility**: Return structured errors for configuration and calculation failures
-- **Type safety**: Usage errors prevented by state machine design and consuming ownership
+- **Core layer responsibility**: Return structured errors only for configuration validation
+- **No composite errors**: Keep error handling simple - complex error composition is CLI concern
 
 ## Testing Strategy
 
@@ -188,8 +192,9 @@ Mathematical properties that must hold regardless of implementation:
 - **State isolation**: Multiple practice sessions don't interfere with each other's state or timing
 
 ### CLI Layer Testing
-Minimal testing since core logic is separate:
+Focus on pure formatting functions and input validation:
 
+- **Formatting functions**: Test exact string output for `format_problem_display()` and `format_results_display()`
 - **Input validation**: Valid integers (1, 42, 1000000) parse correctly; invalid inputs ("abc", "-5", "1.5", "") rejected with clear error messages
   - **Property Test**: All integers converted to strings are parsed without error.
 
