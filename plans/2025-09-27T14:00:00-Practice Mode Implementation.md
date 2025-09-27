@@ -97,10 +97,88 @@ Thanks for practicing!
 - **Return format**: `start()` method returns tuple of `(guesses: Vec<u64>, active_session)` for immediate access to problem data
 
 ### Answer Evaluation
-Answer evaluation results expressed as enum with two distinct states:
-- **Correct**: User answer equals floor(estimation_method_result) or ceiling(estimation_method_result)
-- **Excellent**: User answer closer to exact geometric mean than the rounded estimation method result
-- **Incorrect**: User answer does not equal either floor or ceiling of estimation method result
+Answer evaluation results expressed as enum with three distinct states, using the following precedence:
+
+1. **Correct**: User answer equals floor(estimation_method_result) or ceiling(estimation_method_result)
+2. **Excellent**: User answer is within the "excellent range" around the exact geometric mean
+3. **Incorrect**: User answer does not meet either above criteria
+
+#### Evaluation Logic
+```
+error_margin = |estimation_result - exact_geometric_mean|
+excellent_range = [exact_geometric_mean - error_margin, exact_geometric_mean + error_margin]
+
+if user_answer == floor(estimation_result) OR user_answer == ceil(estimation_result):
+    return Correct
+else if user_answer is within excellent_range:
+    return Excellent
+else:
+    return Incorrect
+```
+
+#### Evaluation Examples
+Test cases demonstrating the evaluation logic:
+
+**Case 1: Estimate: 100.5, Exact: 98.5**
+- Error margin = |100.5 - 98.5| = 2.0
+- Excellent range = [96.5, 100.5]
+- floor(100.5) = 100, ceil(100.5) = 101
+
+| User Answer | floor/ceil Match? | In Excellent Range? | Evaluation | Reasoning |
+|-------------|-------------------|-------------------|------------|-----------|
+| 100 | ✓ (floor) | ✓ | **Correct** | floor/ceil takes precedence |
+| 101 | ✓ (ceil) | ✗ | **Correct** | floor/ceil takes precedence |
+| 102 | ✗ | ✗ | **Incorrect** | Outside both criteria |
+| 99 | ✗ | ✓ | **Excellent** | Within excellent range |
+| 98 | ✗ | ✓ | **Excellent** | Within excellent range |
+| 97 | ✗ | ✓ | **Excellent** | Within excellent range |
+| 96 | ✗ | ✗ | **Incorrect** | Below excellent range |
+
+**Case 2: Estimate: 150.0, Exact: 50.0**
+- Error margin = |150.0 - 50.0| = 100.0
+- Excellent range = [-50.0, 150.0]
+- floor(150.0) = 150, ceil(150.0) = 150
+
+| User Answer | floor/ceil Match? | In Excellent Range? | Evaluation | Reasoning |
+|-------------|-------------------|-------------------|------------|-----------|
+| 150 | ✓ | ✓ | **Correct** | Matches floor/ceil |
+| 100 | ✗ | ✓ | **Excellent** | User surpassed estimation method |
+| 200 | ✗ | ✗ | **Incorrect** | Outside excellent range |
+
+**Case 3: Precision Edge Case - Estimate: 100.000000002, Exact: 98.5**
+- Error margin = |100.000000002 - 98.5| ≈ 1.500000002
+- Excellent range ≈ [97.0, 100.0]
+- floor(100.000000002) = 100, ceil(100.000000002) = 101
+
+| User Answer | floor/ceil Match? | In Excellent Range? | Evaluation | Reasoning |
+|-------------|-------------------|-------------------|------------|-----------|
+| 100 | ✓ (floor) | ✓ | **Correct** | Matches meaningful floor |
+| 101 | ✓ (ceil) | ✗ | **Correct** | Floating point precision artifact |
+| 99 | ✗ | ✓ | **Excellent** | Within excellent range |
+
+**Case 4: Estimate: 100.0, Exact: 98.0**
+- Error margin = |100.0 - 98.0| = 2.0
+- Excellent range = [96.0, 100.0]
+- floor(100.0) = 100, ceil(100.0) = 100
+
+| User Answer | floor/ceil Match? | In Excellent Range? | Evaluation | Reasoning |
+|-------------|-------------------|-------------------|------------|-----------|
+| 100 | ✓ | ✓ | **Correct** | Matches floor/ceil exactly |
+| 96 | ✗ | ✗ | **Incorrect** | At boundary but doesn't match floor/ceil |
+
+**Case 5: Estimate: 100.5, Exact: 99.5**
+- Error margin = |100.5 - 99.5| = 1.0
+- Excellent range = [98.5, 100.5]
+- floor(100.5) = 100, ceil(100.5) = 101
+
+| User Answer | floor/ceil Match? | In Excellent Range? | Evaluation | Reasoning |
+|-------------|-------------------|-------------------|------------|-----------|
+| 100 | ✓ (floor) | ✓ | **Correct** | Matches floor, estimation was reasonable |
+
+#### Implementation Notes
+- **Floating point precision**: Use appropriate epsilon for floor/ceil comparisons to avoid precision artifacts
+- **Range boundaries**: Excellent range uses inclusive boundaries
+- **Precedence**: floor/ceil matching always takes precedence over excellent range checking
 
 ### Timing Requirements
 - **Duration type**: Use `std::time::Duration` throughout instead of raw seconds as `f64`
