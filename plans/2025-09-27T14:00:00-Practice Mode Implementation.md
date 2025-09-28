@@ -175,9 +175,21 @@ Test cases demonstrating the evaluation logic:
 |-------------|-------------------|-------------------|------------|-----------|
 | 100 | ✓ (floor) | ✓ | **Correct** | Matches floor, estimation was reasonable |
 
+**Case 6: Boundary Clarification - Estimate: 100.0, Exact: 98.0**
+- Error margin = |100.0 - 98.0| = 2.0
+- Excellent range = (96.0, 100.0) - exclusive boundaries
+- floor(100.0) = 100, ceil(100.0) = 100
+
+| User Answer | floor/ceil Match? | In Excellent Range? | Evaluation | Reasoning |
+|-------------|-------------------|-------------------|------------|-----------|
+| 100 | ✓ | ✗ (boundary) | **Correct** | Matches floor/ceil exactly |
+| 96 | ✗ | ✗ (boundary) | **Incorrect** | At boundary but doesn't match floor/ceil |
+| 97 | ✗ | ✓ | **Excellent** | Within excellent range |
+| 99 | ✗ | ✓ | **Excellent** | Within excellent range |
+
 #### Implementation Notes
 - **Floating point precision**: Use appropriate epsilon for floor/ceil comparisons to avoid precision artifacts
-- **Range boundaries**: Excellent range uses inclusive boundaries
+- **Range boundaries**: Excellent range uses exclusive boundaries to avoid edge case conflicts
 - **Precedence**: floor/ceil matching always takes precedence over excellent range checking
 
 ### Timing Requirements
