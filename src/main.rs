@@ -4,6 +4,8 @@ mod table_based;
 mod traits;
 mod evaluation;
 mod trivia_guess;
+mod practice_mode;
+mod cli;
 
 use rand::SeedableRng;
 use rand::rngs::StdRng;
@@ -13,7 +15,7 @@ use crate::exact::ExactGeometricMean;
 use crate::log_linear::LogLinearApproximation;
 use crate::table_based::TableBasedApproximation;
 
-fn main() {
+fn compare() {
     println!("Pen and Paper Geometric Mean Comparison");
     println!("======================================");
 
@@ -61,4 +63,23 @@ fn main() {
     println!("  Log-Linear vs Exact: {:.2}x worse", log_linear_results.mean_absolute_relative_error / exact_results.mean_absolute_relative_error);
     println!("  Table-Based vs Exact: {:.2}x worse", table_results.mean_absolute_relative_error / exact_results.mean_absolute_relative_error);
     println!("  Table-Based vs Log-Linear: {:.2}x", table_results.mean_absolute_relative_error / log_linear_results.mean_absolute_relative_error);
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+
+    match args.get(1).map(|s| s.as_str()) {
+        Some("practice") => {
+            cli::practice_mode::run_practice_mode();
+        }
+        Some(arg) => {
+            println!("Unknown argument: {}", arg);
+            println!("Usage:");
+            println!("  cargo run          - Run comparison analysis");
+            println!("  cargo run practice - Enter practice mode");
+        }
+        None => {
+            compare();
+        }
+    }
 }
