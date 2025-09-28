@@ -196,6 +196,7 @@ Test cases demonstrating the evaluation logic:
 - **Duration type**: Use `std::time::Duration` throughout instead of raw seconds as `f64`
 - **Timer precision**: Maintain nanosecond precision internally, display to 0.1 seconds for user
 - **Timer lifecycle**: Start when problem displayed, stop when valid answer submitted
+- **Core responsibility**: All timing logic handled entirely within the core practice module - CLI has zero timing responsibilities
 
 ## Architecture
 
@@ -210,10 +211,11 @@ Core logic uses type states to enforce correct method call ordering:
 
 - **Type states**: `Ready` and `Active` prevent wrong method sequences
 - **Generic over estimation method**: Struct-level generic enables different methods while maintaining type safety
-- **Method flow**: `new()` → `start(config)` → `submit_answer()`
+- **Method flow**: `new()` → `start(config)` → `submit_answer(user_answer)`
 - **Public API**: Only `new()`, `start()`, and `submit_answer()` methods are public
 - **Pure dependencies**: RNG and Timer injected at creation
 - **Random center selection**: `start()` randomly chooses correct answer in log space, then creates distribution
+- **Internal timing**: `start()` captures timer instant internally, `submit_answer()` calculates duration automatically
 
 ### Testable Time Dependencies
 Abstract timing through trait to enable deterministic testing:
@@ -228,9 +230,10 @@ Abstract timing through trait to enable deterministic testing:
 - Call `start()` with configuration for each problem
 - Extract and display problem guesses from returned tuple using dedicated formatting function
 - Prompt for user input and parse as `u64` (no floating point parsing needed)
-- Display results using dedicated formatting function with Duration formatting
+- Call `submit_answer(user_answer)` - core handles all timing internally
+- Display results using dedicated formatting function with Duration from core
 - Handle continue/exit logic and session recreation
-- Manage I/O operations (stdin/stdout) - timing handled by core logic via Timer trait
+- Manage I/O operations (stdin/stdout) only - zero timing responsibilities
 
 ### CLI Formatting Functions
 - **`format_problem_display(guesses: &[u64]) -> String`**: Pure function for consistent guess presentation
