@@ -110,6 +110,7 @@ Due to signature changes in internal functions, several tests need updates:
 2. **`test_reverse_conversion_readme_examples`**:
    - Update inputs: `3.6` → `36`, `2.8` → `28`, etc.
    - All test inputs need to be scaled by 10
+   - **CRITICAL**: Must account for original ceiling rounding behavior (e.g., `2.333` → `24`, not `23`)
 
 3. **`test_round_trip_conversion`**:
    - Update to work with new `i32` return type from `number_to_log_representation`
