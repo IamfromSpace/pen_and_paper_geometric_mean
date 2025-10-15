@@ -57,33 +57,77 @@ Array index represents decimal part (scaled by 10). Forward lookup finds largest
 Modify the existing `src/table_based.rs` module to use integer arithmetic internally while maintaining the same external interface. The public API (`TableBasedApproximation` struct and `table_based_approximation` function) remains unchanged.
 
 ### Internal Changes
-Replace the current floating point implementation with integer arithmetic:
+Replace the current floating point implementation with integer arithmetic throughout the pipeline:
 
 1. **Replace TABLE_ENTRIES with MULTIPLIERS array**: Use direct array indexing instead of tuple lookups
-2. **Modify find_forward_table_entry**: Use integer comparisons to find table index
-3. **Update number_to_log_representation**: Work with scaled integers internally, return f64 for compatibility
-4. **Replace find_reverse_table_entry**: Use direct array access with integer indices
-5. **Update log_representation_to_number**: Accept f64 but work with scaled integers internally
-6. **Modify table_based_approximation**: Use integer averaging for the core calculation
+   ```rust
+   const MULTIPLIERS: [f64; 10] = [1.0, 1.25, 1.6, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0];
+   ```
+
+2. **Modify find_forward_table_entry**: Return table index instead of fractional value
+   ```rust
+   fn find_forward_table_entry(leading_digits: f64) -> usize
+   ```
+
+3. **Update number_to_log_representation**: Return scaled integer instead of f64
+   ```rust
+   fn number_to_log_representation(value: f64) -> i32  // was -> f64
+   ```
+   - Internally: `zeros * 10 + table_index` to create scaled integer
+   - Example: 3600 → digit_count=3, table_index=5 → result=35
+
+4. **Eliminate find_reverse_table_entry**: Replace with direct array access pattern
+   - Use `scaled_value % 10` as index into MULTIPLIERS array
+   - Use `scaled_value / 10` for digit count
+
+5. **Update log_representation_to_number**: Accept scaled integer instead of f64
+   ```rust
+   fn log_representation_to_number(scaled_log: i32) -> f64  // was scaled_log: f64
+   ```
+
+6. **Modify table_based_approximation**: Use pure integer arithmetic for averaging
+   - Convert inputs: `Vec<f64>` → `Vec<i32>` via `number_to_log_representation`
+   - Integer averaging: `sum / count` with truncation
+   - Final conversion: single call to `log_representation_to_number`
 
 ### Key Implementation Notes
-- **Internal scaling**: Convert f64 log values to `i32` by multiplying by 10 (3.6 → 36)
+- **Complete integer pipeline**: No floating point arithmetic between input validation and final result
+- **Scaling factor**: All logarithmic values scaled by 10 (3.6 → 36) to work with integers
 - **Forward lookup**: Find largest index where `MULTIPLIERS[index] <= leading_digits`
 - **Reverse lookup**: Direct array access using `scaled_value % 10` as index
-- **Integer averaging**: Sum scaled integers, divide by count, truncate (maintains existing rounding behavior)
-- **External compatibility**: All public functions still accept/return f64 values
+- **Integer averaging**: `(sum_of_scaled_values / count)` with integer truncation
+- **Single floating point conversion**: Only at the very end in `log_representation_to_number`
 
 ## Testing and Validation
 
+### Test Updates Required
+Due to signature changes in internal functions, several tests need updates:
+
+1. **`test_forward_conversion_readme_examples`**:
+   - Update assertions: `3.3` → `33`, `1.7` → `17`, etc.
+   - All expected results need to be scaled by 10
+
+2. **`test_reverse_conversion_readme_examples`**:
+   - Update inputs: `3.6` → `36`, `2.8` → `28`, etc.
+   - All test inputs need to be scaled by 10
+
+3. **`test_round_trip_conversion`**:
+   - Update to work with new `i32` return type from `number_to_log_representation`
+   - Pass scaled integer to `log_representation_to_number`
+
+4. **Property test `prop_round_trip_within_tolerance`**:
+   - Update to work with new signatures
+
 ### Core Verification
-- **Existing tests pass**: All current tests in `table_based.rs` should continue to pass
-- **README examples**: Verify identical results to documented table method examples
-- **Property-based tests**: Existing QuickCheck tests should maintain or improve precision
+- **Public API unchanged**: `table_based_approximation` function signature remains identical
+- **README examples**: Verify identical final results for documented table method examples
+- **Property-based tests**: All QuickCheck tests should continue to pass with improved precision
 - **Precision improvement**: Integer method should eliminate floating point rounding errors
 - **Edge cases**: Table boundaries, rounding decisions, large inputs
 
 ### Success Criteria
-- [ ] All existing tests pass without modification
+- [ ] Updated tests pass with new internal signatures
+- [ ] Public API tests continue to pass without modification
 - [ ] Eliminates floating point precision errors while maintaining table accuracy
 - [ ] Deterministic, reproducible results across platforms
 - [ ] Performance comparable to existing implementation
