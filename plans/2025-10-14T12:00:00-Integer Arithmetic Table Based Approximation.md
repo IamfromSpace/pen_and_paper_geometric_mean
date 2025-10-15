@@ -54,35 +54,40 @@ Array index represents decimal part (scaled by 10). Forward lookup finds largest
 ## Implementation Plan
 
 ### Module Structure
-Create `src/integer_table_based.rs` for comparison with existing floating point implementation.
+Modify the existing `src/table_based.rs` module to use integer arithmetic internally while maintaining the same external interface. The public API (`TableBasedApproximation` struct and `table_based_approximation` function) remains unchanged.
 
-### Function Signatures
-```rust
-pub fn integer_table_based_approximation(values: &[f64]) -> Result<f64, GeometricMeanError>
-fn number_to_scaled_log_representation(value: f64) -> i32
-fn scaled_log_representation_to_number(scaled_log: i32) -> f64
-fn find_forward_table_index(leading_digits: f64) -> usize
-```
+### Internal Changes
+Replace the current floating point implementation with integer arithmetic:
+
+1. **Replace TABLE_ENTRIES with MULTIPLIERS array**: Use direct array indexing instead of tuple lookups
+2. **Modify find_forward_table_entry**: Use integer comparisons to find table index
+3. **Update number_to_log_representation**: Work with scaled integers internally, return f64 for compatibility
+4. **Replace find_reverse_table_entry**: Use direct array access with integer indices
+5. **Update log_representation_to_number**: Accept f64 but work with scaled integers internally
+6. **Modify table_based_approximation**: Use integer averaging for the core calculation
 
 ### Key Implementation Notes
-- **Forward**: `digit_count * 10 + table_index` where table_index found by largest `MULTIPLIERS[index] <= leading_digits`
-- **Average**: Simple integer division (truncation compatible with existing rounding)
-- **Reverse**: `MULTIPLIERS[scaled_log % 10] * 10^(scaled_log / 10)`
-- **Error handling**: Identical to existing implementation
+- **Internal scaling**: Convert f64 log values to `i32` by multiplying by 10 (3.6 → 36)
+- **Forward lookup**: Find largest index where `MULTIPLIERS[index] <= leading_digits`
+- **Reverse lookup**: Direct array access using `scaled_value % 10` as index
+- **Integer averaging**: Sum scaled integers, divide by count, truncate (maintains existing rounding behavior)
+- **External compatibility**: All public functions still accept/return f64 values
 
 ## Testing and Validation
 
 ### Core Verification
+- **Existing tests pass**: All current tests in `table_based.rs` should continue to pass
 - **README examples**: Verify identical results to documented table method examples
-- **Property-based tests**: Adapt existing QuickCheck tests (order independence, monotonicity, bounds)
-- **Precision comparison**: Integer method should equal or exceed floating point precision
+- **Property-based tests**: Existing QuickCheck tests should maintain or improve precision
+- **Precision improvement**: Integer method should eliminate floating point rounding errors
 - **Edge cases**: Table boundaries, rounding decisions, large inputs
 
 ### Success Criteria
-- [ ] Produces identical/better results than floating point implementation
+- [ ] All existing tests pass without modification
 - [ ] Eliminates floating point precision errors while maintaining table accuracy
 - [ ] Deterministic, reproducible results across platforms
 - [ ] Performance comparable to existing implementation
+- [ ] Order independence property test should now pass consistently
 
 ## Mathematical Properties
 
