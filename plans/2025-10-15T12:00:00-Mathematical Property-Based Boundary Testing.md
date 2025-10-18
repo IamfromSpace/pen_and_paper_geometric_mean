@@ -41,17 +41,22 @@ The table-based method requires **opposite rounding directions** for forward and
 - `N ÷ 10` maps to `L - 1.0` (exactly)
 - Linear mixing creates predictable fractional averages for testing
 
-**Surgical Precision**: This relationship provides **surgical control** over fractional log components, enabling systematic testing of every rounding boundary.
+**Boundary Control**: This relationship provides precise control over fractional log components, enabling systematic testing of every rounding boundary.
 
 ## Mathematical Properties for Testing
 
-### Property 1: Single Number Stability
-**Principle**: Numbers that map to the same table entry should yield identical estimates.
+### Property 1: Forward Rounding Direction Test
+**Principle**: Tests that forward conversion (Number → Log) consistently rounds UP to table boundaries.
 
-**Test**: `estimate([estimate([N])]) == estimate([estimate([N])-1])` **only when both values map to the same table entry**
-**Key Insight**: This property only holds within table quantization boundaries, not across all consecutive integers
+**Primary Test**: `estimate([N]) == estimate([estimate([N]) - 1])`
+**Complementary Test**: `estimate([N]) < estimate([estimate([N]) + 1])`
+
+**Boundary-Forcing Mechanism**: The double estimation `estimate([N])` automatically forces the value to a table boundary. Then:
+- Subtracting 1 steps just below that boundary - should round back UP to the same entry
+- Adding 1 steps just above that boundary - should round UP to the next higher entry
+
 **Minimum Valid N**: Must be ≥ 8
-**Catches**: Forward conversion errors (incorrect table boundary detection)
+**Catches**: Forward conversion errors (round-down vs round-up, off-by-one boundary detection)
 
 ### Property 2: Fractional Boundary Precision
 **Principle**: By controlling the exact fractional component of log averages, we can test the precise boundaries where rounding decisions occur.
