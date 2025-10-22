@@ -21,20 +21,54 @@ The existing test suite has a critical weakness: **rounding boundary errors** ca
 
 The table-based method requires **opposite rounding directions** for forward and reverse conversions:
 
-**Forward Conversion (Number → Log)**: Round **UP**
-- **Principle**: Most numbers between table entries are closer to the higher value
-- **Example**: Between 10 and 100, logarithmic midpoint ≈ 31.6
-  - Numbers 32-99 (68 values) closer to 100 → should round up to log 2.0
-  - Numbers 10-31 (22 values) closer to 10 → should round up to log 1.0
-- **Implementation**: Find smallest table entry ≥ leading digits
+**Forward Conversion (Number → Log)**: Round **DOWN**
+- **Principle**: Conservative log-space estimation prevents error amplification in linear space
+- **Error Analysis**: Floor rounding in log space provides better worst-case relative error when exponentiating back to linear space
+- **Example**: For values near geometric mean √(10×100) ≈ 31.6
+  - Floor rounding: log₁₀(31) ≈ 1.49 → 10^1.49 ≈ 31, relative error = 0/31 = 0%
+  - Ceiling rounding: log₁₀(32) ≈ 1.51 → 10^1.51 ≈ 32, creates systematic overestimation
+- **Implementation**: Find largest table entry ≤ leading digits
 
-**Reverse Conversion (Log → Number)**: Round **DOWN**
-- **Principle**: Conservative estimation prevents systematic overestimation
+**Reverse Conversion (Log → Number)**: Round **UP**
+- **Principle**: Ceiling rounding balances the conservative forward estimation across the full pipeline
+- **Error Balancing**: After floor rounding in forward direction, ceiling in reverse prevents systematic underestimation
 - **Example**: Log average 2.67 is between entries 2.6→2.7
-  - Should round down to 2.6 to avoid inflating the result
-- **Implementation**: Use `floor()` on scaled fractional part
+  - Should round up to 2.7 to balance the conservative forward rounding
+- **Implementation**: Use `ceil()` on scaled fractional part
 
 ### Mathematical Foundation
+
+**Distribution Assumption**: Unlike linear averaging, geometric mean computation assumes log-uniform distribution of input numbers.
+This means equal probability density in log space, not linear space.
+It may be counter-intuitive since there are more numbers above the logarithmic midpoint than below (e.g., between 10 and 100, there are 68 integers above √(10×100) ≈ 31.6 versus 22 below), but this linear counting is irrelevant for log-distributed data where we expect equal probability mass on either side of the midpoint in log space.
+Therefore, rounding decisions should optimize for log-space error characteristics rather than linear counting arguments.
+
+**Error Amplification Analysis**: The critical insight is how errors propagate through the Number→Log→Average→Number pipeline:
+- **Forward errors**: Rounding errors in log conversion become multiplicative errors when exponentiating back
+- **Averaging effects**: Addition in log space equals multiplication in linear space, so systematic bias compounds geometrically
+- **Worst-case bounds**: Floor rounding in log space provides superior worst-case relative error bounds in linear space
+
+**Comprehensive Error Analysis**:
+Consider the boundary between table entries with a concrete example around values near 16:
+
+**Scenario 1 - Value at boundary (16.0)**:
+- Floor strategy: 16.0 → log₂(16) = 4.0 → 2^4.0 = 16.0, relative error = 0%
+- Ceiling strategy: 16.0 → log₂(16) = 4.0 → 2^4.0 = 16.0, relative error = 0%
+
+**Scenario 2 - Value just below higher entry (15.9)**:
+- Floor strategy: 15.9 → log₂(8) = 3.0 → 2^3.0 = 8.0, relative error = (8.0-15.9)/15.9 ≈ -50%
+- Ceiling strategy: 15.9 → log₂(16) = 4.0 → 2^4.0 = 16.0, relative error = (16.0-15.9)/15.9 ≈ +0.6%
+
+**Scenario 3 - Value just above lower entry (8.1)**:
+- Floor strategy: 8.1 → log₂(8) = 3.0 → 2^3.0 = 8.0, relative error = (8.0-8.1)/8.1 ≈ -1.2%
+- Ceiling strategy: 8.1 → log₂(16) = 4.0 → 2^4.0 = 16.0, relative error = (16.0-8.1)/8.1 ≈ +98%
+
+**Key Insight**: Floor rounding produces bounded worst-case errors (~50% underestimation), while ceiling rounding can produce unbounded overestimation errors (approaching 100% for values just above the lower boundary). The multiplicative nature of geometric operations amplifies overestimation errors more severely than underestimation errors.
+
+**Pipeline Error Balancing**:
+- **Forward floor rounding**: Conservative estimation prevents systematic overestimation in log space
+- **Reverse ceiling rounding**: Compensates for conservative forward bias, ensuring final results aren't systematically underestimated
+- **Combined effect**: Creates an error-balanced pipeline that minimizes worst-case relative error
 
 **Scaling Property**: The key insight enabling systematic boundary testing:
 - `N × 10` maps to `L + 1.0` (exactly)
@@ -46,17 +80,17 @@ The table-based method requires **opposite rounding directions** for forward and
 ## Mathematical Properties for Testing
 
 ### Property 1: Forward Rounding Direction Test
-**Principle**: Tests that forward conversion (Number → Log) consistently rounds UP to table boundaries.
+**Principle**: Tests that forward conversion (Number → Log) consistently rounds DOWN to table boundaries.
 
-**Primary Test**: `estimate([N]) == estimate([estimate([N]) - 1])`
-**Complementary Test**: `estimate([N]) < estimate([estimate([N]) + 1])`
+**Primary Test**: `estimate([N]) == estimate([estimate([N]) + 1])`
+**Complementary Test**: `estimate([N]) > estimate([estimate([N]) - 1])`
 
 **Boundary-Forcing Mechanism**: The double estimation `estimate([N])` automatically forces the value to a table boundary. Then:
-- Subtracting 1 steps just below that boundary - should round back UP to the same entry
-- Adding 1 steps just above that boundary - should round UP to the next higher entry
+- Adding 1 steps just above that boundary - should round back DOWN to the same entry
+- Subtracting 1 steps just below that boundary - should round DOWN to the next lower entry
 
 **Minimum Valid N**: Must be ≥ 8
-**Catches**: Forward conversion errors (round-down vs round-up, off-by-one boundary detection)
+**Catches**: Forward conversion errors (round-up vs round-down, off-by-one boundary detection)
 
 ### Property 2: Fractional Boundary Precision
 **Principle**: By controlling the exact fractional component of log averages, we can test the precise boundaries where rounding decisions occur.
@@ -110,19 +144,19 @@ Catches: End-to-end rounding errors in multi-value averaging
 
 **Example 2: Exact Table Boundary**
 ```
-Input: [1249] (leading digit nearly 1.25)
-Expected: 1250 (should map to table index 1, multiplier 1.25)
-Why Critical: Tests forward conversion at exact table entry boundary
-Catches: Forward rounding errors (≥ vs > comparisons)
+Input: [1251] (leading digit nearly 1.25)
+Expected: 1250 (should map to table index 0, multiplier 1.00 due to floor rounding)
+Why Critical: Tests forward conversion floor rounding at exact table entry boundary
+Catches: Forward rounding errors (≤ vs < comparisons)
 ```
 
-**Example 3: Fractional Average Forcing Floor**
+**Example 3: Fractional Average Forcing Ceiling**
 ```
 Input: [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 8000]
 Logs: [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.9] → Average: 3.09
-Expected: 1000 (fractional 0.09 should floor to 0.0)
-Why Critical: Forces reverse conversion floor decision
-Catches: Reverse rounding errors (ceil vs floor vs round)
+Expected: 1250 (fractional 0.09 should ceiling to 0.1, mapping to next table entry)
+Why Critical: Forces reverse conversion ceiling decision
+Catches: Reverse rounding errors (floor vs ceil vs round)
 ```
 
 ## Success Criteria
