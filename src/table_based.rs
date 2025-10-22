@@ -180,6 +180,36 @@ mod tests {
         }
     }
 
+    // Concrete rounding boundary tests from the Mathematical Property-Based Boundary Testing Plan
+
+    #[test]
+    fn test_readme_table_method_case() {
+        use crate::traits::EstimateGeometricMean;
+        // Example 1: README Table Method Case - tests complete pipeline with realistic trivia-like values
+        let result = TableBasedApproximation::estimate_geometric_mean(&[3600.0, 920.0, 740.0]).unwrap();
+        assert!((result - 1250.0).abs() < 50.0, "Expected ~1250, got {}", result);
+    }
+
+    #[test]
+    fn test_exact_table_boundary() {
+        use crate::traits::EstimateGeometricMean;
+        // Example 2: Exact Table Boundary - tests forward conversion floor rounding at exact table entry boundary
+        // 1251 has leading digit nearly 1.25, should map to table index 0 (multiplier 1.00) due to floor rounding
+        let result = TableBasedApproximation::estimate_geometric_mean(&[1251.0]).unwrap();
+        assert!((result - 1250.0).abs() < 50.0, "Expected ~1250, got {}", result);
+    }
+
+    #[test]
+    fn test_fractional_average_forcing_ceiling() {
+        use crate::traits::EstimateGeometricMean;
+        // Example 3: Fractional Average Forcing Ceiling - forces reverse conversion ceiling decision
+        // 9 copies of 1000 (log 3.0) + 1 copy of 8000 (log 3.9) → Average: 3.09
+        // Fractional 0.09 should ceiling to 0.1, mapping to next table entry → Expected: 1250
+        let input = vec![1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 8000.0];
+        let result = TableBasedApproximation::estimate_geometric_mean(&input).unwrap();
+        assert!((result - 1250.0).abs() < 50.0, "Expected ~1250, got {}", result);
+    }
+
     mod property_tests {
         use super::*;
         use crate::exact::geometric_mean;
@@ -294,6 +324,85 @@ mod tests {
             let converted_back = log_representation_to_number(log_repr);
             let relative_error = (converted_back - x.0).abs() / x.0;
             relative_error < 1.0
+        }
+
+        // Property 1: Forward Rounding Direction Test
+        // Tests that forward conversion (Number → Log) consistently rounds DOWN to table boundaries
+        #[quickcheck]
+        fn prop_forward_rounding_direction_primary(n: GeOneF64) -> TestResult {
+            if n.0 < 8.0 {
+                return TestResult::discard();
+            }
+
+            let boundary_result = TableBasedApproximation::estimate_geometric_mean(&[n.0]).unwrap();
+            let above_boundary_result = TableBasedApproximation::estimate_geometric_mean(&[boundary_result + 1.0]).unwrap();
+
+            TestResult::from_bool((boundary_result - above_boundary_result).abs() < 1e-10)
+        }
+
+        #[quickcheck]
+        fn prop_forward_rounding_direction_complementary(n: GeOneF64) -> TestResult {
+            if n.0 < 8.0 || n.0 > 1e15 {
+                return TestResult::discard();
+            }
+
+            let boundary_result = TableBasedApproximation::estimate_geometric_mean(&[n.0]).unwrap();
+
+            // Prevent going below minimum value 1.0
+            if boundary_result <= 1.0 {
+                return TestResult::discard();
+            }
+
+            // For very large numbers, subtracting 1.0 might not make a meaningful difference
+            // due to floating point precision. Ensure the subtraction is meaningful.
+            if (boundary_result - 1.0) == boundary_result {
+                return TestResult::discard();
+            }
+
+            let below_boundary_result = TableBasedApproximation::estimate_geometric_mean(&[boundary_result - 1.0]).unwrap();
+
+            TestResult::from_bool(boundary_result > below_boundary_result)
+        }
+
+        // Property 2: Fractional Boundary Precision Test
+        // Tests the complete rounding pipeline with controlled fractional log components
+        #[derive(Clone, Debug)]
+        struct ValidCounts {
+            n: usize,
+            m: usize,
+        }
+
+        impl Arbitrary for ValidCounts {
+            fn arbitrary(g: &mut Gen) -> Self {
+                let n = (usize::arbitrary(g) % 10) + 1; // 1-10
+                let m = (usize::arbitrary(g) % 10) + 1; // 1-10
+                ValidCounts { n, m }
+            }
+        }
+
+        #[quickcheck]
+        fn prop_fractional_boundary_precision(x: GeOneF64, counts: ValidCounts) -> TestResult {
+            if x.0 < 1.0 || x.0 >= 1e18 {
+                return TestResult::discard();
+            }
+
+            let base = x.0;
+            let high_value = base * 10.0;
+
+            // Create mixed array: n copies of high_value, (m+1) copies of base
+            let mut mixed_array = vec![high_value; counts.n];
+            mixed_array.extend(vec![base; counts.m + 1]);
+
+            // Create pure high value array
+            let pure_high_array = vec![high_value];
+
+            let mixed_result = TableBasedApproximation::estimate_geometric_mean(&mixed_array).unwrap();
+            let pure_high_result = TableBasedApproximation::estimate_geometric_mean(&pure_high_array).unwrap();
+
+            // The mixed array average should be less than or equal to the pure high value
+            // This tests the complete rounding pipeline with random boundary conditions
+            let tolerance = (pure_high_result * 0.01).max(1e-6);
+            TestResult::from_bool(mixed_result <= pure_high_result + tolerance)
         }
     }
 }
