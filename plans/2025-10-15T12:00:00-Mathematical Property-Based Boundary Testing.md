@@ -102,19 +102,23 @@ The power of scaling by exactly 10 is that it **automatically guarantees** predi
 - **Guaranteed property**: base, base×10, and base÷10 naturally map to the same table entry
 - This eliminates confounding quantization effects from the base values themselves
 
-**Simple Property-Based Testing**:
-Instead of complex fractional calculations, use this elegant monotonicity property:
+**Essential Requirements for Property 2**:
 
-**Core Property**: For any base `x` and counts `n`, `m`:
+**Mathematical Foundation for Bounds**:
+The table quantizes fractional parts to 0.1 increments. For ceiling vs round-to-nearest to reliably differ:
+- Need fractional part = `1/(1+n) < 0.05` (half of table precision)
+- Solving: `n > 19`, so **minimum requirement: n ≥ 20**
+- **u8 range recommended**: `n=255` → fractional = 1/256 = 0.004 (12x beyond minimum)
+
+**The Property to Test**:
 ```
-estimate([n copies of x×10, (m+1) copies of x]) ≤ estimate([x×10])
+estimate([1 copy of x×10, n copies of x]) > estimate([x])
 ```
 
-**Why This Works**:
-- `x×10` maps to log `L+1`, `x` maps to log `L`
-- Mixed array average: `L + n/(n+m+1)` where `n/(n+m+1) < 1`
-- Therefore mixed array log < pure high value log
-- **Key insight**: This tests the complete rounding pipeline with random boundary conditions
+**Why This Property Works**:
+- **Tests ceiling generosity**: Adding any high value should improve result vs base-only
+- **Detects rounding errors**: Round-to-nearest may equal base-only, ceiling should exceed it
+- **Single parameter**: Only n varies (as u8), keeping implementation straightforward
 
 ## Why This Approach is Superior
 
