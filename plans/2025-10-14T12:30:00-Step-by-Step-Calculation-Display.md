@@ -121,6 +121,30 @@ pub struct TableBasedSteps {
 - **Clear progression**: Each step builds logically on the previous step
 - **Table-based specifics**: Show table lookups and decimal log representations that humans would use
 
+## Evolution Strategy: Planned Technical Debt
+
+This implementation intentionally creates temporary dead code during the evolution process to ensure safety and allow rollback if issues arise:
+
+### **Phases 1-2**: Temporary Dead Code (Intentional)
+- `table_based_approximation()` function will become unused but retained
+- Provides safety net during step-by-step implementation
+- Allows easy rollback if step-by-step calculations have issues
+- Tests can verify exact equivalence between old and new approaches
+- **Expected**: Compilation warnings about unused functions during this phase
+
+### **Phase 3**: Dead Code Cleanup (Required)
+- Remove unused `table_based_approximation()` function once step-by-step is proven
+- Verify blanket implementation provides all needed functionality
+- Ensure no compilation warnings remain
+- **Critical**: This cleanup phase is mandatory, not optional
+
+### **Rationale**
+Evolution through temporary duplication is safer than immediate replacement:
+- Old implementation serves as reference for correctness validation
+- Step-by-step can be thoroughly tested against known-good implementation
+- Any discrepancies discovered before old code is removed
+- Clean final state with no dead code or warnings
+
 ## Architecture
 
 ### Core Calculation Refactoring
@@ -128,17 +152,19 @@ Transform existing calculation functions to always produce step-by-step data:
 
 #### Current Function Transformation
 ```rust
-// Before (current)
-fn table_based_approximation(values: &[f64]) -> Result<f64, GeometricMeanError>
+// Phase 1: Add new step-by-step function alongside existing
+fn table_based_approximation(values: &[f64]) -> Result<f64, GeometricMeanError>  // Temporary
+fn table_based_approximation_steps(values: &[f64]) -> Result<TableBasedSteps, GeometricMeanError>  // New primary
 
-// After (step-by-step becomes primary)
-fn table_based_approximation_steps(values: &[f64]) -> Result<TableBasedSteps, GeometricMeanError>
+// Phase 2: Remove old function - EstimateGeometricMean provided via blanket implementation
+fn table_based_approximation_steps(values: &[f64]) -> Result<TableBasedSteps, GeometricMeanError>  // Only function
 
-// Original function can be removed - EstimateGeometricMean provided via other traits
 // Users call either:
-// - TableBasedApproximation::estimate_geometric_mean(values) // via other traits
+// - TableBasedApproximation::estimate_geometric_mean(values) // via blanket implementation
 // - TableBasedApproximation::estimate_geometric_mean_steps(values) // direct step-by-step
 ```
+
+**Evolution Approach**: The old function is kept during initial implementation phases to enable thorough testing and validation, then removed once the step-by-step approach is proven equivalent.
 
 #### Step-by-Step Data Capture
 Each intermediate calculation stores its input, process, and output for complete reconstruction of the calculation path.
@@ -221,8 +247,19 @@ fn test_table_based_steps_display_format() {
    - **Test**: All existing tests pass without modification (backward compatibility preserved)
    - **Test**: EstimateGeometricMean delegates to step-by-step calculation for correctness
    - **Test**: Both trait methods return identical results for same input
+   - **Note**: `table_based_approximation()` function will show as unused at this point (expected)
 
-### Phase 2: Practice Mode Integration
+### Phase 2: Dead Code Cleanup
+1. Remove unused `table_based_approximation()` function
+   - **Test**: All existing tests still pass without the old function
+   - **Test**: No compilation warnings remain
+   - **Test**: Blanket implementation provides complete EstimateGeometricMean functionality
+2. Verify clean codebase state
+   - **Test**: `cargo build` produces no warnings
+   - **Test**: All EstimateGeometricMean call sites work through blanket implementation
+   - **Test**: Step-by-step functionality remains fully operational
+
+### Phase 3: Practice Mode Integration
 1. Update ActiveSession and PracticeResult to store input data for on-demand calculation
    - **Test**: Session creation and data structure updates work correctly
    - **Test**: Input values preserved correctly for later step-by-step calculation
@@ -248,7 +285,11 @@ Implementation complete when:
 5. Display output format is clean, readable, and shows decimal representations (e.g., 3.6) while maintaining internal integer precision
 6. Testing demonstrates exact string matching for step-by-step output
 7. Table-based method supports step-by-step display (log-linear method reserved for future implementation)
-8. No dead code is left behind (via `cargo test` or `cargo build`)
+8. **Clean codebase with no dead code or warnings**:
+   - `cargo build` produces zero compilation warnings
+   - No unused functions, dead code, or unreachable code remains
+   - All functionality provided through clean trait implementations
+   - Temporary technical debt from evolution process fully cleaned up
 
 ## Implementation Notes
 
