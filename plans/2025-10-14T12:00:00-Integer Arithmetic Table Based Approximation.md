@@ -37,11 +37,11 @@ Scale logarithmic representations by 10 to work with integers instead of floatin
    - 920: digit_count=2, leading=9.2, table_lookup(9.2)→index_9, result=29
    - 740: digit_count=2, leading=7.4, table_lookup(7.4)→index_7, result=27
 
-2. **Integer averaging**: [35, 29, 27] → (35+29+27)/3 = 91/3 = 30 (truncate)
+2. **Integer averaging**: [35, 29, 27] → (35+29+27)/3 = 91/3 = 31 (ceiling)
 
-3. **Reverse conversion**: 30 → digit_count=3, fractional_index=0, MULTIPLIERS[0]=1.0, result=1000.0
+3. **Reverse conversion**: 31 → digit_count=3, fractional_index=1, MULTIPLIERS[0]=1.0, result=1250.0
 
-**Compare**: Exact geometric mean ≈ 1281.7, our result = 1000.0
+**Compare**: Exact geometric mean ≈ 1281.7, our result = 1250.0
 
 ### Table Representation
 ```rust
@@ -87,7 +87,7 @@ Replace the current floating point implementation with integer arithmetic throug
 
 6. **Modify table_based_approximation**: Use pure integer arithmetic for averaging
    - Convert inputs: `Vec<f64>` → `Vec<i32>` via `number_to_log_representation`
-   - Integer averaging: `sum / count` with truncation
+   - Integer averaging: `(sum + count - 1) / count` ceiling given truncation
    - Final conversion: single call to `log_representation_to_number`
 
 ### Key Implementation Notes
@@ -95,7 +95,7 @@ Replace the current floating point implementation with integer arithmetic throug
 - **Scaling factor**: All logarithmic values scaled by 10 (3.6 → 36) to work with integers
 - **Forward lookup**: Find largest index where `MULTIPLIERS[index] <= leading_digits`
 - **Reverse lookup**: Direct array access using `scaled_value % 10` as index
-- **Integer averaging**: `(sum_of_scaled_values / count)` with integer truncation
+- **Integer averaging to ceiling**: `(sum_of_scaled_values + count - 1) / count` to compensate for truncation
 - **Single floating point conversion**: Only at the very end in `log_representation_to_number`
 
 ## Testing and Validation
