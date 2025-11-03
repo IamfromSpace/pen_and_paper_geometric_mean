@@ -248,6 +248,7 @@ Implementation complete when:
 5. Display output format is clean, readable, and shows decimal representations (e.g., 3.6) while maintaining internal integer precision
 6. Testing demonstrates exact string matching for step-by-step output
 7. Table-based method supports step-by-step display (log-linear method reserved for future implementation)
+8. No dead code is left behind (via `cargo test` or `cargo build`)
 
 ## Implementation Notes
 
