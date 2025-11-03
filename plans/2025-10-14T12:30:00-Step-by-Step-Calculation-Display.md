@@ -194,8 +194,8 @@ fn test_table_based_steps_display_format() {
 ```
 
 **Key Testing Principle**: Use `assert_eq!` with complete expected strings rather than `contains()` checks. This ensures the formatting is exactly right and catches any unintended changes to the step-by-step display format.
-```
 
+**Use Mocks**: By using mock step-by-step method, we can perfectly predict the string output
 **Property-based testing**: Step-by-step equivalence, display determinism, trait implementation consistency
 **Practice mode integration**: Conditional display only for incorrect answers
 
