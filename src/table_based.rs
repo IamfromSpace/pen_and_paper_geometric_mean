@@ -27,55 +27,30 @@ impl crate::traits::EstimateGeometricMean for TableBasedApproximation {
     }
 }
 
-const TABLE_ENTRIES: [(f64, f64); 10] = [
-    (0.0, 1.0),
-    (0.1, 1.25),
-    (0.2, 1.6),
-    (0.3, 2.0),
-    (0.4, 2.5),
-    (0.5, 3.0),
-    (0.6, 4.0),
-    (0.7, 5.0),
-    (0.8, 6.0),
-    (0.9, 8.0),
+const MULTIPLIERS: [f64; 10] = [
+    1.0, 1.25, 1.6, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0
 ];
 
-fn find_forward_table_entry(leading_digits: f64) -> f64 {
-    for i in (0..TABLE_ENTRIES.len()).rev() {
-        if leading_digits >= TABLE_ENTRIES[i].1 {
-            return TABLE_ENTRIES[i].0;
+fn find_forward_table_entry(leading_digits: f64) -> usize {
+    for i in (0..MULTIPLIERS.len()).rev() {
+        if leading_digits >= MULTIPLIERS[i] {
+            return i;
         }
     }
-    TABLE_ENTRIES[0].0
+    0
 }
 
-fn number_to_log_representation(value: f64) -> f64 {
+fn number_to_log_representation(value: f64) -> i32 {
     let zeros = value.log10().floor() as i32;
     let leading_digits = value / 10.0_f64.powi(zeros);
-    let decimal_part = find_forward_table_entry(leading_digits);
-    zeros as f64 + decimal_part
+    let table_index = find_forward_table_entry(leading_digits);
+    zeros * 10 + table_index as i32
 }
 
-fn find_reverse_table_entry(fractional_part: f64) -> f64 {
-    // Multiply by 10 to convert 0.1 increments to integers
-    let scaled = fractional_part * 10.0;
-
-    // Choose rounding strategy: exact match vs round up
-    let rounded = scaled.round();
-    let raw_index = if (scaled - rounded).abs() < 1e-10 {
-        rounded
-    } else {
-        scaled.ceil()
-    };
-
-    let index = (raw_index as usize).min(9);
-    TABLE_ENTRIES[index].1
-}
-
-fn log_representation_to_number(log_value: f64) -> f64 {
-    let zeros = log_value.floor() as i32;
-    let fractional_part = log_value - zeros as f64;
-    let multiplier = find_reverse_table_entry(fractional_part);
+fn log_representation_to_number(scaled_log: i32) -> f64 {
+    let zeros = scaled_log / 10;
+    let fractional_index = scaled_log % 10;
+    let multiplier = MULTIPLIERS[fractional_index as usize];
     multiplier * 10.0_f64.powi(zeros)
 }
 
@@ -93,10 +68,10 @@ fn table_based_approximation(values: &[f64]) -> Result<f64, GeometricMeanError> 
         }
     }
 
-    let sum: f64 = values.iter()
+    let sum: i32 = values.iter()
         .map(|&v| number_to_log_representation(v))
         .sum();
-    let average = sum / values.len() as f64;
+    let average = (sum + values.len() as i32 - 1) / values.len() as i32;
 
     Ok(log_representation_to_number(average))
 }
@@ -108,48 +83,48 @@ mod tests {
     #[test]
     fn test_forward_conversion_readme_examples() {
         let result = number_to_log_representation(2000.0);
-        assert!((result - 3.3).abs() < 1e-10);
+        assert_eq!(result, 33);
 
         let result = number_to_log_representation(50.0);
-        assert!((result - 1.7).abs() < 1e-10);
+        assert_eq!(result, 17);
 
         let result = number_to_log_representation(1250000.0);
-        assert!((result - 6.1).abs() < 1e-10);
+        assert_eq!(result, 61);
 
         let result = number_to_log_representation(350.0);
-        assert!((result - 2.5).abs() < 1e-10);
+        assert_eq!(result, 25);
 
         let result = number_to_log_representation(1400.0);
-        assert!((result - 3.1).abs() < 1e-10);
+        assert_eq!(result, 31);
 
         let result = number_to_log_representation(11.0);
-        assert!((result - 1.0).abs() < 1e-10);
+        assert_eq!(result, 10);
 
         let result = number_to_log_representation(9001.0);
-        assert!((result - 3.9).abs() < 1e-10);
+        assert_eq!(result, 39);
     }
 
     #[test]
     fn test_reverse_conversion_readme_examples() {
-        let result = log_representation_to_number(3.6);
+        let result = log_representation_to_number(36);
         assert!((result - 4000.0).abs() < 1e-6);
 
-        let result = log_representation_to_number(2.8);
+        let result = log_representation_to_number(28);
         assert!((result - 600.0).abs() < 1e-6);
 
-        let result = log_representation_to_number(7.2);
+        let result = log_representation_to_number(72);
         assert!((result - 16000000.0).abs() < 1e-6);
 
-        let result = log_representation_to_number(4.4);
+        let result = log_representation_to_number(44);
         assert!((result - 25000.0).abs() < 1e-6);
 
-        let result = log_representation_to_number(2.333);
+        let result = log_representation_to_number(24);
         assert!((result - 250.0).abs() < 1e-6);
 
-        let result = log_representation_to_number(7.75);
+        let result = log_representation_to_number(78);
         assert!((result - 60000000.0).abs() < 1e-6);
 
-        let result = log_representation_to_number(4.167);
+        let result = log_representation_to_number(42);
         assert!((result - 16000.0).abs() < 1e-6);
     }
 
@@ -240,8 +215,6 @@ mod tests {
         }
 
         #[quickcheck]
-        // TODO: Fix order independence test failure - precision issues with table lookups
-        // causing order-dependent rounding errors when same values processed in different orders
         fn prop_order_independence(mut values: Vec<GeOneF64>) -> TestResult {
             if values.len() < 2 {
                 return TestResult::discard();
