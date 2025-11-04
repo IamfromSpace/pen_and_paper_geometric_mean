@@ -1,5 +1,4 @@
 use std::io::{self, Write};
-use std::time::Duration;
 
 use crate::practice_mode::{
     AnswerEvaluation, PracticeModeConfig, PracticeSession, Ready, SystemTimer,
@@ -20,13 +19,16 @@ pub fn format_problem_display(guesses: &[u64]) -> String {
 }
 
 /// Format results display for consistent presentation
-pub fn format_results_display(
-    user_answer: u64,
-    exact_mean: f64,
-    estimation_result: u64,
-    duration: Duration,
-    evaluation: AnswerEvaluation,
-) -> String {
+pub fn format_results_display<E>(result: &crate::practice_mode::PracticeResult<E>) -> String
+where
+    E: crate::traits::EstimateGeometricMeanStepByStep,
+    E::StepByStep: std::fmt::Display,
+{
+    let user_answer = result.user_answer;
+    let exact_mean = result.exact_geometric_mean;
+    let estimation_result = result.estimation_result;
+    let duration = result.duration;
+    let evaluation = &result.evaluation;
     let mut output = String::new();
 
     output.push_str("Results:\n");
@@ -46,6 +48,19 @@ pub fn format_results_display(
         }
         AnswerEvaluation::Incorrect => {
             output.push_str("You have calculated the estimation method incorrectly.\n");
+            output.push('\n');
+            output.push_str("Step-by-step calculation:\n");
+            output.push_str("========================\n");
+
+            match result.get_step_by_step() {
+                Ok(steps) => {
+                    output.push_str(&format!("{}", steps));
+                }
+                Err(_) => {
+                    output.push_str("Error calculating step-by-step display");
+                }
+            }
+            output.push('\n');
         }
     }
 
@@ -180,13 +195,7 @@ pub fn run_practice_mode() {
         let result = active_session.submit_answer(user_answer);
 
         // Display results
-        print!("{}", format_results_display(
-            result.user_answer,
-            result.exact_geometric_mean,
-            result.estimation_result,
-            result.duration,
-            result.evaluation,
-        ));
+        print!("{}", format_results_display(&result));
         println!();
 
         // Check if user wants to continue
@@ -215,53 +224,79 @@ mod tests {
 
     #[test]
     fn test_format_results_display_correct() {
-        let result = format_results_display(
-            420,
-            387.4,
-            400,
-            Duration::from_millis(12300),
-            AnswerEvaluation::Correct,
-        );
+        use crate::practice_mode::{PracticeResult, AnswerEvaluation};
+        use std::marker::PhantomData;
 
-        assert!(result.contains("Your answer: 420"));
-        assert!(result.contains("Exact geometric mean: 387.4"));
-        assert!(result.contains("Estimation method result: 400"));
-        assert!(result.contains("Time taken: 12.3 seconds"));
-        assert!(result.contains("✓ CORRECT! You calculated the estimation method properly."));
+        // Create a mock result for testing
+        let result = PracticeResult {
+            user_answer: 420,
+            exact_geometric_mean: 387.4,
+            estimation_result: 400,
+            duration: Duration::from_millis(12300),
+            evaluation: AnswerEvaluation::Correct,
+            input_values: vec![25.0, 400.0],
+            estimation_method: PhantomData::<crate::table_based::TableBasedApproximation>,
+        };
+
+        let output = format_results_display(&result);
+
+        assert!(output.contains("Your answer: 420"));
+        assert!(output.contains("Exact geometric mean: 387.4"));
+        assert!(output.contains("Estimation method result: 400"));
+        assert!(output.contains("Time taken: 12.3 seconds"));
+        assert!(output.contains("✓ CORRECT! You calculated the estimation method properly."));
     }
 
     #[test]
     fn test_format_results_display_excellent() {
-        let result = format_results_display(
-            410,
-            417.3,
-            400,
-            Duration::from_millis(5100),
-            AnswerEvaluation::Excellent,
-        );
+        use crate::practice_mode::{PracticeResult, AnswerEvaluation};
+        use std::marker::PhantomData;
 
-        assert!(result.contains("Your answer: 410"));
-        assert!(result.contains("Exact geometric mean: 417.3"));
-        assert!(result.contains("Estimation method result: 400"));
-        assert!(result.contains("Time taken: 5.1 seconds"));
-        assert!(result.contains("★ EXCELLENT! Your answer is closer to the exact value than the estimation method!"));
+        let result = PracticeResult {
+            user_answer: 410,
+            exact_geometric_mean: 417.3,
+            estimation_result: 400,
+            duration: Duration::from_millis(5100),
+            evaluation: AnswerEvaluation::Excellent,
+            input_values: vec![25.0, 400.0],
+            estimation_method: PhantomData::<crate::table_based::TableBasedApproximation>,
+        };
+
+        let output = format_results_display(&result);
+
+        assert!(output.contains("Your answer: 410"));
+        assert!(output.contains("Exact geometric mean: 417.3"));
+        assert!(output.contains("Estimation method result: 400"));
+        assert!(output.contains("Time taken: 5.1 seconds"));
+        assert!(output.contains("★ EXCELLENT! Your answer is closer to the exact value than the estimation method!"));
     }
 
     #[test]
     fn test_format_results_display_incorrect() {
-        let result = format_results_display(
-            2000,
-            346.4,
-            400,
-            Duration::from_millis(8700),
-            AnswerEvaluation::Incorrect,
-        );
+        use crate::practice_mode::{PracticeResult, AnswerEvaluation};
+        use std::marker::PhantomData;
 
-        assert!(result.contains("Your answer: 2,000"));
-        assert!(result.contains("Exact geometric mean: 346.4"));
-        assert!(result.contains("Estimation method result: 400"));
-        assert!(result.contains("Time taken: 8.7 seconds"));
-        assert!(result.contains("You have calculated the estimation method incorrectly."));
+        let result = PracticeResult {
+            user_answer: 2000,
+            exact_geometric_mean: 346.4,
+            estimation_result: 400,
+            duration: Duration::from_millis(8700),
+            evaluation: AnswerEvaluation::Incorrect,
+            input_values: vec![25.0, 400.0],
+            estimation_method: PhantomData::<crate::table_based::TableBasedApproximation>,
+        };
+
+        let output = format_results_display(&result);
+
+        assert!(output.contains("Your answer: 2,000"));
+        assert!(output.contains("Exact geometric mean: 346.4"));
+        assert!(output.contains("Estimation method result: 400"));
+        assert!(output.contains("Time taken: 8.7 seconds"));
+        assert!(output.contains("You have calculated the estimation method incorrectly."));
+        assert!(output.contains("Step-by-step calculation:"));
+        assert!(output.contains("========================"));
+        assert!(output.contains("25 → 1.4"));
+        assert!(output.contains("400 → 2.6"));
     }
 
     #[test]

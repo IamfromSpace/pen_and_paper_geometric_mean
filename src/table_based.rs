@@ -1,3 +1,5 @@
+use crate::traits::{EstimateGeometricMeanStepByStep, FinalAnswer};
+
 #[derive(Debug, PartialEq)]
 pub enum GeometricMeanError {
     EmptyInput,
@@ -17,13 +19,75 @@ impl std::fmt::Display for GeometricMeanError {
 
 impl std::error::Error for GeometricMeanError {}
 
+pub struct TableBasedSteps {
+    input_values: Vec<f64>,
+    log_conversions: Vec<i32>,
+    sum: i32,
+    average: i32,
+    final_result: f64,
+}
+
 pub struct TableBasedApproximation;
+
+impl crate::traits::FinalAnswer for TableBasedSteps {
+    fn final_answer(&self) -> f64 {
+        self.final_result
+    }
+}
+
+impl crate::traits::EstimateGeometricMeanStepByStep for TableBasedApproximation {
+    type StepByStep = TableBasedSteps;
+    type Error = GeometricMeanError;
+
+    fn estimate_geometric_mean_steps(values: &[f64]) -> Result<Self::StepByStep, Self::Error> {
+        table_based_approximation_steps(values)
+    }
+}
 
 impl crate::traits::EstimateGeometricMean for TableBasedApproximation {
     type Error = GeometricMeanError;
 
     fn estimate_geometric_mean(values: &[f64]) -> Result<f64, Self::Error> {
-        table_based_approximation(values)
+        let steps = Self::estimate_geometric_mean_steps(values)?;
+        Ok(steps.final_answer())
+    }
+}
+
+impl std::fmt::Display for TableBasedSteps {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Input values: [{}]",
+            self.input_values.iter()
+                .map(|v| if v.fract() == 0.0 { format!("{}", *v as u64) } else { format!("{}", v) })
+                .collect::<Vec<_>>()
+                .join(", "))?;
+        writeln!(f)?;
+
+        writeln!(f, "1. Convert each value to log representation:")?;
+        for (value, &log_conv) in self.input_values.iter().zip(self.log_conversions.iter()) {
+            let displayed_value = if value.fract() == 0.0 { format!("{}", *value as u64) } else { format!("{}", value) };
+            writeln!(f, "   {} → {:.1}", displayed_value, log_conv as f64 / 10.0)?;
+        }
+        writeln!(f)?;
+
+        writeln!(f, "2. Calculate average of log representations:")?;
+        let log_terms: Vec<String> = self.log_conversions.iter()
+            .map(|&log_conv| format!("{:.1}", log_conv as f64 / 10.0))
+            .collect();
+        writeln!(f, "   ({}) ÷ {} = {:.1} ÷ {} = {:.1}",
+                 log_terms.join(" + "),
+                 self.input_values.len(),
+                 self.sum as f64 / 10.0,
+                 self.input_values.len(),
+                 self.average as f64 / 10.0)?;
+        writeln!(f)?;
+
+        writeln!(f, "3. Convert back to final estimate:")?;
+        writeln!(f, "   {:.1} → {}", self.average as f64 / 10.0,
+                 if self.final_result.fract() == 0.0 { format!("{}", self.final_result as u64) } else { format!("{}", self.final_result) })?;
+        writeln!(f)?;
+
+        write!(f, "Final estimation: {}",
+               if self.final_result.fract() == 0.0 { format!("{}", self.final_result as u64) } else { format!("{}", self.final_result) })
     }
 }
 
@@ -54,7 +118,8 @@ fn log_representation_to_number(scaled_log: i32) -> f64 {
     multiplier * 10.0_f64.powi(zeros)
 }
 
-fn table_based_approximation(values: &[f64]) -> Result<f64, GeometricMeanError> {
+
+fn table_based_approximation_steps(values: &[f64]) -> Result<TableBasedSteps, GeometricMeanError> {
     if values.is_empty() {
         return Err(GeometricMeanError::EmptyInput);
     }
@@ -68,12 +133,22 @@ fn table_based_approximation(values: &[f64]) -> Result<f64, GeometricMeanError> 
         }
     }
 
-    let sum: i32 = values.iter()
+    let input_values = values.to_vec();
+    let log_conversions: Vec<i32> = values.iter()
         .map(|&v| number_to_log_representation(v))
-        .sum();
-    let average = (sum + values.len() as i32 - 1) / values.len() as i32;
+        .collect();
 
-    Ok(log_representation_to_number(average))
+    let sum: i32 = log_conversions.iter().sum();
+    let average = (sum + values.len() as i32 - 1) / values.len() as i32;
+    let final_result = log_representation_to_number(average);
+
+    Ok(TableBasedSteps {
+        input_values,
+        log_conversions,
+        sum,
+        average,
+        final_result,
+    })
 }
 
 #[cfg(test)]
@@ -183,6 +258,27 @@ mod tests {
         let input = vec![1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 8000.0];
         let result = TableBasedApproximation::estimate_geometric_mean(&input).unwrap();
         assert!((result - 1250.0).abs() < 50.0, "Expected ~1250, got {}", result);
+    }
+
+    #[test]
+    fn test_table_based_steps_display_format() {
+        let steps = TableBasedApproximation::estimate_geometric_mean_steps(&[25.0, 400.0]).unwrap();
+        let output = format!("{}", steps);
+
+        let expected = "Input values: [25, 400]\n\n1. Convert each value to log representation:\n   25 → 1.4\n   400 → 2.6\n\n2. Calculate average of log representations:\n   (1.4 + 2.6) ÷ 2 = 4.0 ÷ 2 = 2.0\n\n3. Convert back to final estimate:\n   2.0 → 100\n\nFinal estimation: 100";
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_step_by_step_calculation_equivalence() {
+        use crate::traits::EstimateGeometricMean;
+        let values = [25.0, 400.0, 1200.0, 8000.0];
+        let direct_result = TableBasedApproximation::estimate_geometric_mean(&values).unwrap();
+        let steps = TableBasedApproximation::estimate_geometric_mean_steps(&values).unwrap();
+        let step_result = steps.final_answer();
+
+        assert!((direct_result - step_result).abs() < 1e-10,
+                "Direct: {}, Step-by-step: {}", direct_result, step_result);
     }
 
     mod property_tests {

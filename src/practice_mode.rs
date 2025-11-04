@@ -104,6 +104,7 @@ pub struct PracticeSession<S, R, T, E> {
 
 /// Active session containing problem data and timing information
 pub struct ActiveSession<T: Timer, E> {
+    input_values: Vec<f64>,
     exact_geometric_mean: f64,
     estimation_result: f64,
     start_instant: T::Instant,
@@ -154,6 +155,7 @@ impl<R: Rng, T: Timer, E: EstimateGeometricMean> PracticeSession<Ready, R, T, E>
         let start_instant = self.timer.now();
 
         let active_session = ActiveSession {
+            input_values: guesses_f64,
             exact_geometric_mean,
             estimation_result,
             start_instant,
@@ -167,7 +169,7 @@ impl<R: Rng, T: Timer, E: EstimateGeometricMean> PracticeSession<Ready, R, T, E>
 
 impl<T: Timer, E: EstimateGeometricMean> ActiveSession<T, E> {
     /// Submit user answer and get evaluation result
-    pub fn submit_answer(self, user_answer: u64) -> PracticeResult {
+    pub fn submit_answer(self, user_answer: u64) -> PracticeResult<E> {
         let duration = self.timer.elapsed(self.start_instant);
 
         let evaluation = evaluate_answer(
@@ -182,18 +184,32 @@ impl<T: Timer, E: EstimateGeometricMean> ActiveSession<T, E> {
             estimation_result: self.estimation_result as u64,
             duration,
             evaluation,
+            input_values: self.input_values,
+            estimation_method: PhantomData,
         }
     }
 }
 
 /// Result of a practice session submission
 #[derive(Debug, Clone, PartialEq)]
-pub struct PracticeResult {
+pub struct PracticeResult<E> {
     pub user_answer: u64,
     pub exact_geometric_mean: f64,
     pub estimation_result: u64,
     pub duration: Duration,
     pub evaluation: AnswerEvaluation,
+    pub input_values: Vec<f64>,
+    pub estimation_method: PhantomData<E>,
+}
+
+impl<E> PracticeResult<E>
+where
+    E: crate::traits::EstimateGeometricMeanStepByStep,
+{
+    /// Get step-by-step calculation for this result
+    pub fn get_step_by_step(&self) -> Result<E::StepByStep, E::Error> {
+        E::estimate_geometric_mean_steps(&self.input_values)
+    }
 }
 
 /// Evaluate user answer according to plan specifications
